@@ -3,8 +3,67 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-void processFile(FILE* input,FILE* output){
+typedef struct ArqResources{
+	uint32_t* Mem;
+	uint32_t Reg[32];
+	uint32_t xyl;
+	uint8_t x,y,i,z;
+}ArqResources;
 
+
+ArqResources* inicialization(uint8_t x,uint8_t y,uint8_t i,uint8_t z,uint32_t xyl){
+	ArqResources* newArq = (ArqResources*)malloc(sizeof(ArqResources));
+	newArq->Mem = (uint32_t*)calloc(8,1024);
+	newArq->xyl = xyl;
+	newArq->x = x;
+	newArq->z = z;
+	newArq->i = i;
+	newArq->y = y;
+	return newArq;
+}
+
+void showReg(ArqResources* arq){
+	for(int i = 0; i < 26;i++){
+		printf("R[%d] = 0x%08X\n",i,arq->Reg[i]);
+	}
+	printf("==============================\n");
+	printf("IR = 0x%08X\n",arq->Reg[28]);
+	printf("PC = 0x%08X\n",arq->Reg[29]);
+	printf("SP = 0x%08X\n",arq->Reg[30]);
+	printf("SR = 0x%08X\n",arq->Reg[31]);
+	printf("==============================\n");
+
+}
+
+void showMemory(ArqResources* arq){
+	printf("--------------------------------------------\n");
+	printf("                  Memória                   \n");
+	printf("--------------------------------------------\n");
+	for(int i = 0; i < 186; i = i + 1) {
+		// Impressao lado a lado
+		printf("0x%08X: 0x%08X (0x%02X 0x%02X 0x%02X 0x%02X)\n", i << 2, arq->Mem[i], ((uint8_t*)(arq->Mem))[(i << 2) + 3], ((uint8_t*)(arq->Mem))[(i << 2) + 2], ((uint8_t*)(arq->Mem))[(i << 2) + 1], ((uint8_t*)(arq->Mem))[(i << 2) + 0]);
+	}
+	printf("--------------------------------------------\n");
+
+}
+
+void processFile(FILE* input,FILE* output){
+	ArqResources* newArq = inicialization(0,0,0,0,0);
+	uint8_t i = 0;
+	while(!feof(input)){
+		fscanf(input,"0x%8X\n",&newArq->Mem[i]);
+		i++;
+	}
+	showMemory(newArq);
+	showReg(newArq);
+	i = 0;
+	while(i < 186){
+		newArq->Reg[28] = newArq->Mem[newArq->Reg[29] >> 2];
+		uint8_t opcode = (newArq->Reg[28] & (0b111111 << 26)) >> 26;
+		printf("0x%08X: Opcode: 0x%08X\n",newArq->Mem[newArq->Reg[29] >> 2],opcode);
+		newArq->Reg[29] = newArq->Reg[29] + 4;
+		i++;
+	}
 }
 
 int main(int argc, char* argv[]){
@@ -17,7 +76,7 @@ int main(int argc, char* argv[]){
 		return 1;
 	}
 
-	FILE* input = fopen(inputFile, "w");
+	FILE* output = fopen(outputFile, "w");
 	if(!output){
 		fclose(input);
 		return 1;
