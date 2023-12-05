@@ -10,6 +10,22 @@ typedef struct ArqResources{
 	uint8_t x,y,i,z;
 }ArqResources;
 
+typedef struct typeU{
+	uint8_t opcode;
+	uint8_t z,x,y;
+	uint16_t l;
+}typeU;
+
+typedef struct typeF{
+	uint8_t opcode;
+	uint8_t z,x;
+	uint16_t i;
+}typeF;
+
+typedef struct typeS{
+	uint8_t opcode;
+	uint32_t i;
+}typeS;
 
 ArqResources* inicialization(uint8_t x,uint8_t y,uint8_t i,uint8_t z,uint32_t xyl){
 	ArqResources* newArq = (ArqResources*)malloc(sizeof(ArqResources));
@@ -20,6 +36,17 @@ ArqResources* inicialization(uint8_t x,uint8_t y,uint8_t i,uint8_t z,uint32_t xy
 	newArq->i = i;
 	newArq->y = y;
 	return newArq;
+}
+
+char opcodeType(uint8_t op){
+	if(op <= 0b1001 && op >= 0b0000)
+		return 'U';
+	else if((op <= 0b011101 && op >= 0b011000) || (op <= 0b010111 && op >= 0b010010))
+		return 'F';
+	else if(op >= 0b101010 && op <= 0b111111)
+		return 'S';
+	else
+		return 'E';
 }
 
 void showReg(ArqResources* arq){
@@ -60,7 +87,7 @@ void processFile(FILE* input,FILE* output){
 	while(i < 186){
 		newArq->Reg[28] = newArq->Mem[newArq->Reg[29] >> 2];
 		uint8_t opcode = (newArq->Reg[28] & (0b111111 << 26)) >> 26;
-		printf("0x%08X: Opcode: 0x%08X\n",newArq->Mem[newArq->Reg[29] >> 2],opcode);
+		printf("0x%08X: Opcode: 0x%08X - type:%c\n",newArq->Mem[newArq->Reg[29] >> 2],opcode,opcodeType(opcode));
 		newArq->Reg[29] = newArq->Reg[29] + 4;
 		i++;
 	}
