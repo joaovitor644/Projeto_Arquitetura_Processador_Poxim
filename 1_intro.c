@@ -6,8 +6,6 @@
 typedef struct ArqResources{
 	uint32_t* Mem;
 	uint32_t Reg[32];
-	uint32_t xyl;
-	uint8_t x,y,i,z;
 }ArqResources;
 
 typedef struct typeU{
@@ -27,14 +25,9 @@ typedef struct typeS{
 	uint32_t i;
 }typeS;
 
-ArqResources* inicialization(uint8_t x,uint8_t y,uint8_t i,uint8_t z,uint32_t xyl){
+ArqResources* inicialization(){
 	ArqResources* newArq = (ArqResources*)malloc(sizeof(ArqResources));
 	newArq->Mem = (uint32_t*)calloc(8,1024);
-	newArq->xyl = xyl;
-	newArq->x = x;
-	newArq->z = z;
-	newArq->i = i;
-	newArq->y = y;
 	return newArq;
 }
 
@@ -47,6 +40,30 @@ char opcodeType(uint8_t op){
 		return 'S';
 	else
 		return 'E';
+}
+
+
+typeU* newInstU(uint8_t op,uint8_t x, uint8_t y, uint8_t z, uint16_t l){
+	typeU* newT = (typeU*)malloc(sizeof(typeU));
+	newT->opcode = op;
+	newT->x = x;
+	newT->y = y;
+	newT->z = z;
+	newT->l = l;
+	return newT;
+}
+typeF* newInstF(uint8_t op,uint8_t x,uint8_t z,uint16_t i){
+	typeF* newT = (typeF*)malloc(sizeof(typeF));
+	newT->x = x;
+	newT->opcode = op;
+	newT->i = i;
+	return newT;	
+}
+typeS* newInstS(uint8_t op,uint32_t i){
+	typeS* newT = (typeS*)malloc(sizeof(typeS));
+	newT->opcode = op;
+	newT->i = i;
+	return newT;
 }
 
 void showReg(ArqResources* arq){
@@ -75,7 +92,7 @@ void showMemory(ArqResources* arq){
 }
 
 void processFile(FILE* input,FILE* output){
-	ArqResources* newArq = inicialization(0,0,0,0,0);
+	ArqResources* newArq = inicialization();
 	uint8_t i = 0;
 	while(!feof(input)){
 		fscanf(input,"0x%8X\n",&newArq->Mem[i]);
@@ -87,7 +104,18 @@ void processFile(FILE* input,FILE* output){
 	while(i < 186){
 		newArq->Reg[28] = newArq->Mem[newArq->Reg[29] >> 2];
 		uint8_t opcode = (newArq->Reg[28] & (0b111111 << 26)) >> 26;
-		printf("0x%08X: Opcode: 0x%08X - type:%c\n",newArq->Mem[newArq->Reg[29] >> 2],opcode,opcodeType(opcode));
+		char optype = opcodeType(opcode);
+		typeU* newIU = malloc(sizeof(typeU));
+		if(optype == 'U'){
+			newIU->opcode = opcode;
+			newIU->x = (newArq->Reg[28] & (0b11111 << 16)) >> 16;
+			//printf("res = 0x%08X\n",(newArq->Reg[28] & (0b11111 << 16)) >> 16);
+			newIU->y = (newArq->Reg[28] & (0b11111 << 11)) >> 11;
+			newIU->z = (newArq->Reg[28] & (0b11111 << 21)) >> 21;
+			newIU->l = (newArq->Reg[28] & (0b11111111111));
+		}
+		printf("0x%08X - 0x%08X: Opcode: 0x%08X - type:%c - ",i << 2,newArq->Mem[newArq->Reg[29] >> 2],opcode,opcodeType(opcode)) ;
+		if(optype == 'U' && newIU != NULL) printf("x = 0x%08X,y = 0x%08X,z = 0x%08X,l = 0x%08X \n",newIU->x,newIU->y,newIU->z,newIU->l); else printf("\n");
 		newArq->Reg[29] = newArq->Reg[29] + 4;
 		i++;
 	}
