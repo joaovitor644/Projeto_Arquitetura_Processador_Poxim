@@ -42,28 +42,18 @@ char opcodeType(uint8_t op){
 		return 'E';
 }
 
-
-typeU* newInstU(uint8_t op,uint8_t x, uint8_t y, uint8_t z, uint16_t l){
-	typeU* newT = (typeU*)malloc(sizeof(typeU));
-	newT->opcode = op;
-	newT->x = x;
-	newT->y = y;
-	newT->z = z;
-	newT->l = l;
-	return newT;
-}
-typeF* newInstF(uint8_t op,uint8_t x,uint8_t z,uint16_t i){
-	typeF* newT = (typeF*)malloc(sizeof(typeF));
-	newT->x = x;
-	newT->opcode = op;
-	newT->i = i;
-	return newT;	
-}
-typeS* newInstS(uint8_t op,uint32_t i){
-	typeS* newT = (typeS*)malloc(sizeof(typeS));
-	newT->opcode = op;
-	newT->i = i;
-	return newT;
+void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
+	switch(instruction->opcode){
+		case 0b000000:
+			char instrucao[30];
+			uint32_t xyl = arq->Reg[28] & 0x1FFFFF;
+			sprintf(instrucao, "mov r%u,%u", instruction->z, xyl);
+			printf("0x%08X:\t%-25s\tR%u=MEM[0x%08X]=0x%02X\n", arq->Reg[29],instrucao, instruction->z, arq->Reg[instruction->x] + i, arq->Reg[instruction->z]);
+			break;
+		default:
+			printf("[INSTRUÇÃO NÃO MAPEADA]\n");
+			break;
+	}
 }
 
 void showReg(ArqResources* arq){
@@ -106,16 +96,32 @@ void processFile(FILE* input,FILE* output){
 		uint8_t opcode = (newArq->Reg[28] & (0b111111 << 26)) >> 26;
 		char optype = opcodeType(opcode);
 		typeU* newIU = malloc(sizeof(typeU));
+		typeF* newIF = malloc(sizeof(typeF));
+		typeS* newIS = malloc(sizeof(typeS));
 		if(optype == 'U'){
 			newIU->opcode = opcode;
 			newIU->x = (newArq->Reg[28] & (0b11111 << 16)) >> 16;
-			//printf("res = 0x%08X\n",(newArq->Reg[28] & (0b11111 << 16)) >> 16);
 			newIU->y = (newArq->Reg[28] & (0b11111 << 11)) >> 11;
 			newIU->z = (newArq->Reg[28] & (0b11111 << 21)) >> 21;
 			newIU->l = (newArq->Reg[28] & (0b11111111111));
+			//printf("0x%08X - 0x%08X: Opcode: 0x%08X - type:%c - x = 0x%08X,y = 0x%08X,z = 0x%08X,l = 0x%08X \n",i << 2,newArq->Mem[newArq->Reg[29] >> 2],opcode,opcodeType(opcode),newIU->x,newIU->y,newIU->z,newIU->l) ;
+			executionInstructionTypeU(newArq,newIU,i);
 		}
-		printf("0x%08X - 0x%08X: Opcode: 0x%08X - type:%c - ",i << 2,newArq->Mem[newArq->Reg[29] >> 2],opcode,opcodeType(opcode)) ;
-		if(optype == 'U' && newIU != NULL) printf("x = 0x%08X,y = 0x%08X,z = 0x%08X,l = 0x%08X \n",newIU->x,newIU->y,newIU->z,newIU->l); else printf("\n");
+		if(optype == 'F'){
+			newIF->opcode = opcode;
+			newIF->x = (newArq->Reg[28] & (0b11111 << 16)) >> 16;
+			newIF->z = (newArq->Reg[28] & (0b11111 << 21)) >> 21;
+			newIF->i = (newArq->Reg[28] & (0b1111111111111111));
+			printf("0x%08X - 0x%08X: Opcode: 0x%08X - type:%c - x = 0x%08X,z = 0x%08X,i = 0x%08X \n",i << 2,newArq->Mem[newArq->Reg[29] >> 2],opcode,opcodeType(opcode),newIF->x,newIF->z,newIF->i) ;
+		}
+		if(optype == 'S'){
+			newIS->opcode = opcode;
+			newIS->i = (newArq->Reg[28] & (0b11111111111111111111111111));
+			printf("0x%08X - 0x%08X: Opcode: 0x%08X - type:%c - i = 0x%08X \n",i << 2,newArq->Mem[newArq->Reg[29] >> 2],opcode,opcodeType(opcode),newIS->i);
+		} 
+	       if(optype != 'U' && optype != 'F' && optype != 'S')	{
+			printf("[ERRO - INSTRUÇÃO NÃO ENCONTRADA]\n");
+		}
 		newArq->Reg[29] = newArq->Reg[29] + 4;
 		i++;
 	}
