@@ -83,6 +83,11 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,uint32_t i){
 			arq->Reg[instruction->z] = arq->Mem[(instruction->x + instruction->i) << 2];
 			printf("0x%08X:\t%-25s\tR%d=MEM[0x%08X]=0x%08X\n", arq->Reg[29],instrucao,instruction->z,(instruction->x + instruction->i) << 2,arq->Mem[(instruction->x + instruction->i) << 2]);
 			break;
+		case 0b011000:
+			sprintf(instrucao,"l8 r%d,[r%d+%d]",instruction->z,arq->Reg[instruction->x],instruction->i);
+			arq->Reg[instruction->z] = arq->Mem[(instruction->x +instruction->i)];
+			printf("0x%08X:\t%-25s\tR%d=MEM[0x%08X]=0x%08X\n",arq->Reg[29],instrucao,instruction->z,instruction->x + instruction->i,arq->Mem[instruction->x+instruction->i]);
+			break;
 		default:
 			printf("[INSTRUÇÃO NÃO MAPEADA - F - Opcode = 0x%08X]\n",instruction->opcode);
 			break;
