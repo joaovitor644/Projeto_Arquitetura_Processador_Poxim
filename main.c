@@ -30,7 +30,7 @@ ArqResources* inicialization(){
 	newArq->Mem = (uint32_t*)calloc(8,1024);
 	return newArq;
 }
-
+// OBS SR 6->ZN ,5->ZD, 4->SN , 3->OV, 2->IV , 1- --- , 0->CY;
 char opcodeType(uint8_t op){
 	if(op <= 0b1001 && op >= 0b0000)
 		return 'U';
@@ -88,6 +88,14 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,uint32_t i){
 			arq->Reg[instruction->z] = arq->Mem[(instruction->x +instruction->i)];
 			printf("0x%08X:\t%-25s\tR%d=MEM[0x%08X]=0x%08X\n",arq->Reg[29],instrucao,instruction->z,instruction->x + instruction->i,arq->Mem[instruction->x+instruction->i]);
 			break;
+		case 0b010010:
+			sprintf(instrucao,"addi r%d,r%d,%d",instruction->z,instruction->x,instruction->i);
+			arq->Reg[instruction->z] = arq->Reg[instruction->x] + instruction->z;
+			arq->Reg[instruction->z] == 0? arq->Reg[31] = arq->Reg[31] | (0b1 << 6) : arq->Reg[31] | (0b0 << 6);
+			(arq->Reg[instruction->z] & (0b1 << 31) >> 31) == 1? arq->Reg[31] = arq->Reg[31] = arq->Reg[31] | (0b1 << 4) : arq->Reg[31] = arq->Reg[31] & (0b0 << 4);
+			uint8_t ov = ((arq->Reg[instruction->x] & (0b1 << 3)) >> 3) != ((instruction->i & (0b1 << 15)) >> 15) && ((arq->Reg[instruction->z] & (0b1 << 31)) >> 31) !=  ((arq->Reg[instruction->x] & (0b1 << 31) >> 31));
+			ov == 1? arq->Reg[31] = arq->Reg[31] | (ov << 3) : arq->Reg[31] = arq->Reg[31] & (0b0 << 3); 
+			printf("0x%08X:\t%-25s\tR%d=R%d+0x%08X")
 		default:
 			printf("[INSTRUÇÃO NÃO MAPEADA - F - Opcode = 0x%08X]\n",instruction->opcode);
 			break;
