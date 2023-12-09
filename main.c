@@ -228,6 +228,17 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,uint32_t i){
 			sprintf(instrucao, "int %d", instruction->i);
 			printf("0x%08X:\t%-25s\tCR=0x%08X,PC=0x%08x\n", arq->Reg[29],instrucao,0,0);
 			break;
+		case 0b101010:
+			sprintf(instrucao,"bae %d",instruction->i);
+			if(ShiftBit(arq->Reg[31],0,1) == 0)
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]);
+			break;
+		case 0b101011:
+			sprintf(instrucao,"bat %d",instruction->i);
+			if(ShiftBit(arq->Reg[29],6,1) == 0 && ShiftBit(arq->Reg[29],0,1) == 0)
+				arq->Reg[29] = arq->Reg[29] + 4 +(instructon->i <<	2);
+			printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]);
 		default:
 			printf("[INSTRUÇÃO NÃO MAPEADA - S]\n");
 			break;
