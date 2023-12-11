@@ -78,30 +78,81 @@ char opcodeType(uint8_t op){
 
 void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 	switch(instruction->opcode){
+		char instrucao[30];
+		
 		case 0b000000:
-			char instrucao[30];
 			uint32_t xyl = arq->Reg[28] & 0x1FFFFF;
+			//printf("-----> xyl = 0x%08x,R28=0x%08X\n",xyl,arq->Reg[28]);
 			if(instruction->z == 28){
-				sprintf(instrucao, "mov ir,%u", xyl);
+				sprintf(instrucao, "mov ir,%d", xyl);
+				arq->Reg[instruction->z] = xyl;
 				printf("0x%08X:\t%-25s\tIR=MEM[0x%08X]=0x%02X\n", arq->Reg[29],instrucao, arq->Reg[instruction->x] + i, arq->Reg[instruction->z]);
 			}
 			else if(instruction->z == 29){
-				sprintf(instrucao, "mov pc,%u", xyl);
+				sprintf(instrucao, "mov pc,%d", xyl);
+				arq->Reg[instruction->z] = xyl;
 				printf("0x%08X:\t%-25s\tPC=MEM[0x%08X]=0x%02X\n", arq->Reg[29],instrucao,  arq->Reg[instruction->x] + i, arq->Reg[instruction->z]);
 			}
 			else if(instruction->z == 30){
-				sprintf(instrucao, "mov sp,%u",xyl);
+				sprintf(instrucao, "mov sp,%d",xyl);
+				arq->Reg[instruction->z] = xyl;
 				printf("0x%08X:\t%-25s\tSP=MEM[0x%08X]=0x%02X\n", arq->Reg[29],instrucao, arq->Reg[instruction->x] + i, arq->Reg[instruction->z]);
 			}
 			else if(instruction->z == 31){
-				sprintf(instrucao, "mov sr,%u", xyl);
+				sprintf(instrucao, "mov sr,%d", xyl);
+				arq->Reg[instruction->z] = xyl;
 				printf("0x%08X:\t%-25s\tSR=MEM[0x%08X]=0x%02X\n", arq->Reg[29],instrucao, arq->Reg[instruction->x] + i, arq->Reg[instruction->z]);
 			}
 			else {
-				sprintf(instrucao, "mov r%u,%u", instruction->z, xyl);
+				sprintf(instrucao, "mov r%d,%d", instruction->z, xyl);
 				arq->Reg[instruction->z] = xyl;
 				printf("0x%08X:\t%-25s\tR%u=0x%08X\n", arq->Reg[29],instrucao, instruction->z, arq->Reg[instruction->z]);
 			}
+			break;
+		case 0b000001:
+			uint32_t x4 = ShiftBit(arq->Reg[28] & 0x1FFFFF,20,1);
+			int32_t xyl_1 = ((int32_t)(arq->Reg[28] & 0x1FFFFF));
+			int32_t x4xyl = x4 == 1 ? (0x7FF << 21) + xyl_1 : (arq->Reg[28] & 0x1FFFFF);
+			uint8_t a_ZD = ShiftBit(arq->Reg[31],5,1);
+			uint8_t a_IV = ShiftBit(arq->Reg[31],2,1);
+			if(instruction->z == 28){
+				sprintf(instrucao, "movs ir,%d", x4xyl);
+				arq->Reg[instruction->z] = x4xyl;
+				printf("0x%08X:\t%-25s\tIR=MEM[0x%08X]=0x%02X\n", arq->Reg[29],instrucao, arq->Reg[instruction->x] + i, arq->Reg[instruction->z]);
+			}
+			else if(instruction->z == 29){
+				sprintf(instrucao, "movs pc,%d", x4xyl);
+				arq->Reg[instruction->z] = x4xyl;
+				printf("0x%08X:\t%-25s\tPC=MEM[0x%08X]=0x%02X\n", arq->Reg[29],instrucao,  arq->Reg[instruction->x] + i, arq->Reg[instruction->z]);
+			}
+			else if(instruction->z == 30){
+				arq->Reg[instruction->z] = x4xyl;
+				sprintf(instrucao, "movs sp,%d",x4xyl);
+				printf("0x%08X:\t%-25s\tSP=MEM[0x%08X]=0x%02X\n", arq->Reg[29],instrucao, arq->Reg[instruction->x] + i, arq->Reg[instruction->z]);
+			}
+			else if(instruction->z == 31){
+				sprintf(instrucao, "movs sr,%d", x4xyl);
+				arq->Reg[instruction->z] = x4xyl;
+				printf("0x%08X:\t%-25s\tSR=MEM[0x%08X]=0x%02X\n", arq->Reg[29],instrucao, arq->Reg[instruction->x] + i, arq->Reg[instruction->z]);
+			}
+			else {
+				sprintf(instrucao, "movs r%d,%d", instruction->z, x4xyl);
+				arq->Reg[instruction->z] = x4xyl;
+				printf("0x%08X:\t%-25s\tR%d=0x%08X\n", arq->Reg[29],instrucao, instruction->z, arq->Reg[instruction->z]);
+			}
+			break;
+		case 0b000010:
+			uint64_t cyv = (uint64_t)(arq->Reg[instruction->x]) + (uint64_t)(arq->Reg[instruction->y]);
+			printf("cyv = 0x%016lX\n",cyv);
+			arq->Reg[instruction->z] = (uint64_t)arq->Reg[instruction->x] + arq->Reg[instruction->y];
+			uint8_t n_ZN = arq->Reg[instruction->z] == 0;
+			uint8_t n_SN = ShiftBit(arq->Reg[instruction->z],31,1) == 1;
+			uint8_t n_OV = (ShiftBit(arq->Reg[instruction->x],31,1) != ShiftBit(arq->Reg[instruction->y],31,1)) && ShiftBit(arq->Reg[instruction->z],31,1) != ShiftBit(arq->Reg[instruction->x],31,1);
+			uint8_t n_CY = ShiftBit(cyv,33,1) == 1;
+			printf("ZN=0x%08X,SN=0x%08X,OV=0x%08X,CY=0x%08X\n",n_ZN,n_SN,n_OV,n_CY);
+			sprintf(instrucao,"add r%d,r%d,r%d",instruction->z,instruction->x,instruction->y);
+			changeSR(a_ZD,n_ZN,n_SN,n_OV,a_IV,n_CY,arq);
+			printf("0x%08X:\t%-25s\tR%u=R%d+R%d=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,instruction->z,instruction->x,instruction->y,arq->Reg[instruction->z],arq->Reg[31]);
 			break;
 		default:
 			printf("[INSTRUÇÃO NÃO MAPEADA - U]\n");
@@ -151,6 +202,7 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,uint32_t i){
 			sprintf(instrucao,"s32 [r%d%s%d],r%d",arq->Reg[instruction->x],(instruction->i >= 0) ? ("+") : (""),instruction->i,instruction->z);
 			arq->Mem[(arq->Reg[instruction->x] + instruction->i) >> 2] = arq->Reg[instruction->z];
 			printf("0x%08X:\t%-25s\tMEM[0x%08X]=R%d=0x%08X\n", arq->Reg[29],instrucao,(arq->Reg[instruction->x] + instruction->i) << 2,instruction->z,arq->Reg[instruction->z]);
+			break;
 		case 0b010010:
 			sprintf(instrucao,"addi r%d,r%d,%d",instruction->z,instruction->x,instruction->i);
 			arq->Reg[instruction->z] = arq->Reg[instruction->x] + instruction->i;
@@ -221,8 +273,13 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,uint32_t i){
 	switch(instruction->opcode){
 		case 0b110111:
 			sprintf(instrucao, "bun %d", instruction->i);
-			printf("0x%08X:\t%-25s\tPC=0x%08x\n", arq->Reg[29],instrucao,arq->Reg[29] + 4*instruction->i );
-			arq->Reg[29] = arq->Reg[29] + 4*instruction->i ;
+			if(instruction->i == 0){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n", arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n", arq->Reg[29],instrucao,arq->Reg[29] + 4*instruction->i + 4);
+				arq->Reg[29] = arq->Reg[29] + 4*instruction->i + 4;
+			}
 			break;
 		case 0b111111:
 			sprintf(instrucao, "int %d", instruction->i);
@@ -230,15 +287,158 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,uint32_t i){
 			break;
 		case 0b101010:
 			sprintf(instrucao,"bae %d",instruction->i);
-			if(ShiftBit(arq->Reg[31],0,1) == 0)
+			if(ShiftBit(arq->Reg[31],0,1) == 0){
+				
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
 				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
-			printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
 			break;
 		case 0b101011:
 			sprintf(instrucao,"bat %d",instruction->i);
-			if(ShiftBit(arq->Reg[29],6,1) == 0 && ShiftBit(arq->Reg[29],0,1) == 0)
-				arq->Reg[29] = arq->Reg[29] + 4 +(instructon->i <<	2);
-			printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]);
+			if(ShiftBit(arq->Reg[29],6,1) == 0 && ShiftBit(arq->Reg[29],0,1) == 0){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
+			
+			break;
+		case 0b101100:
+			sprintf(instrucao,"bbe %d",instruction->i);
+			if(ShiftBit(arq->Reg[29],6,1) == 1 || ShiftBit(arq->Reg[29],0,1) == 1){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
+			
+			break;
+		case 0b101101:
+			sprintf(instrucao,"bbt %d",instruction->i);
+			if(ShiftBit(arq->Reg[31],0,1) == 1){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
+			
+			break;
+		case 0b101110:
+			sprintf(instrucao,"beq %d",instruction->i);
+			if(ShiftBit(arq->Reg[31],5,1) == 1){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
+			
+			break;
+		case 0b101111:
+			sprintf(instrucao,"bge %d",instruction->i);
+			if(ShiftBit(arq->Reg[31],4,1) == ShiftBit(arq->Reg[31],3,1)){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
+			
+			break;
+		case 0b110000:
+			sprintf(instrucao,"bgt %d",instruction->i);
+			if(ShiftBit(arq->Reg[31],5,1) == 0 && (ShiftBit(arq->Reg[31],4,1) == ShiftBit(arq->Reg[31],3,1))){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
+			
+			break;
+		case 0b110001:
+			sprintf(instrucao,"biv %d",instruction->i);
+			if(ShiftBit(arq->Reg[31],2,1)){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
+			
+			break;
+		case 0b110010:
+			sprintf(instrucao,"ble %d",instruction->i);
+			if(ShiftBit(arq->Reg[29],5,1) == 1 || ShiftBit(arq->Reg[29],4,1) != ShiftBit(arq->Reg[29],3,1)){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
+			
+			break;
+		case 0b110011:
+			sprintf(instrucao,"blt %d",instruction->i);
+			if(ShiftBit(arq->Reg[31],4,1) != ShiftBit(arq->Reg[31],3,1)){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
+			
+			break;
+		case 0b110100:
+			sprintf(instrucao,"bne %d",instruction->i);
+			if(ShiftBit(arq->Reg[31],5,1) == 0){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
+			
+			break;
+		case 0b110101:
+			sprintf(instrucao,"bni %d",instruction->i);
+			if(ShiftBit(arq->Reg[31],2,1) == 0){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
+			
+			break;
+		case 0b110110:
+			sprintf(instrucao,"bnz %d",instruction->i);
+			if(ShiftBit(arq->Reg[31],5,1) == 0){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
+			
+			break;
+		case 0b111000:
+			sprintf(instrucao,"bzd %d",instruction->i);
+			if(ShiftBit(arq->Reg[31],6,1)){
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (instruction->i << 2));
+				arq->Reg[29] = arq->Reg[29] + 4 + (instruction->i << 2);
+			} else {
+				printf("0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29] + 4);
+				arq->Reg[29] = arq->Reg[29] + 4;
+			}
+			
+			break;
 		default:
 			printf("[INSTRUÇÃO NÃO MAPEADA - S]\n");
 			break;
@@ -294,6 +494,7 @@ void processFile(FILE* input,FILE* output){
 			newIU->z = (newArq->Reg[28] & (0b11111 << 21)) >> 21;
 			newIU->l = (newArq->Reg[28] & (0b11111111111));
 			executionInstructionTypeU(newArq,newIU,i);
+			newArq->Reg[29] = newArq->Reg[29] + 4;
 		}
 		else if(optype == 'F'){
 			newIF->opcode = opcode;
@@ -301,6 +502,7 @@ void processFile(FILE* input,FILE* output){
 			newIF->z = (newArq->Reg[28] & (0b11111 << 21)) >> 21;
 			newIF->i = (newArq->Reg[28] & (0xFFFF));
 			executionInstructionTypeF(newArq,newIF,i);
+			newArq->Reg[29] = newArq->Reg[29] + 4;
 		}
 		else if(optype == 'S'){
 			newIS->opcode = opcode;
@@ -314,16 +516,15 @@ void processFile(FILE* input,FILE* output){
 			printf("[ERRO - INSTRUÇÃO NÃO ENCONTRADA]\n");
 		}
 
-		newArq->Reg[29] = newArq->Reg[29] + 4;
 		i++;
 	}
 	printf("[END OF SIMULATION]\n");
 	//showMemory(newArq);
-	showReg(newArq);
+	//showReg(newArq);
 }
 
 void Tests(){
-	Equal_Decimal(ShiftBit(0b10110011,6,1),0b0,"Test 1 - Passed");
+	Equal_Decimal(ShiftBit(0x00000000F0000000,31,1),0b1,"Test 1 - Passed");
 	//Equal_Decimal(changeSR(1,1,0,1,0,1),0b1101001,"Test 2 - Passed");
 }
 
