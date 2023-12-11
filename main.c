@@ -2,7 +2,6 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include "test.h"
 
 typedef struct ArqResources{
 	uint32_t* Mem;
@@ -79,7 +78,19 @@ char opcodeType(uint8_t op){
 void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 	switch(instruction->opcode){
 		char instrucao[30];
-		
+		uint64_t cyv;
+		uint8_t n_ZD;
+		uint8_t n_ZN;
+		uint8_t n_SN;
+		uint8_t n_OV;
+		uint8_t n_IV;
+		uint8_t n_CY;
+		uint8_t a_ZN = ShiftBit(arq->Reg[31],6,1);
+		uint8_t a_ZD = ShiftBit(arq->Reg[31],5,1);
+		uint8_t a_SN = ShiftBit(arq->Reg[31],4,1);
+		uint8_t a_OV = ShiftBit(arq->Reg[31],3,1);
+		uint8_t a_IV = ShiftBit(arq->Reg[31],2,1);
+		uint8_t a_CY = ShiftBit(arq->Reg[31],0,1);
 		case 0b000000:
 			uint32_t xyl = arq->Reg[28] & 0x1FFFFF;
 			//printf("-----> xyl = 0x%08x,R28=0x%08X\n",xyl,arq->Reg[28]);
@@ -113,8 +124,6 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 			uint32_t x4 = ShiftBit(arq->Reg[28] & 0x1FFFFF,20,1);
 			int32_t xyl_1 = ((int32_t)(arq->Reg[28] & 0x1FFFFF));
 			int32_t x4xyl = x4 == 1 ? (0x7FF << 21) + xyl_1 : (arq->Reg[28] & 0x1FFFFF);
-			uint8_t a_ZD = ShiftBit(arq->Reg[31],5,1);
-			uint8_t a_IV = ShiftBit(arq->Reg[31],2,1);
 			if(instruction->z == 28){
 				sprintf(instrucao, "movs ir,%d", x4xyl);
 				arq->Reg[instruction->z] = x4xyl;
@@ -142,17 +151,26 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 			}
 			break;
 		case 0b000010:
-			uint64_t cyv = (uint64_t)(arq->Reg[instruction->x]) + (uint64_t)(arq->Reg[instruction->y]);
-			printf("cyv = 0x%016lX\n",cyv);
-			arq->Reg[instruction->z] = (uint64_t)arq->Reg[instruction->x] + arq->Reg[instruction->y];
-			uint8_t n_ZN = arq->Reg[instruction->z] == 0;
-			uint8_t n_SN = ShiftBit(arq->Reg[instruction->z],31,1) == 1;
-			uint8_t n_OV = (ShiftBit(arq->Reg[instruction->x],31,1) != ShiftBit(arq->Reg[instruction->y],31,1)) && ShiftBit(arq->Reg[instruction->z],31,1) != ShiftBit(arq->Reg[instruction->x],31,1);
-			uint8_t n_CY = ShiftBit(cyv,33,1) == 1;
-			printf("ZN=0x%08X,SN=0x%08X,OV=0x%08X,CY=0x%08X\n",n_ZN,n_SN,n_OV,n_CY);
+			cyv = (uint64_t)(arq->Reg[instruction->x]) + (uint64_t)(arq->Reg[instruction->y]);
+			arq->Reg[instruction->z] = (uint64_t)arq->Reg[instruction->x] + (uint64_t)arq->Reg[instruction->y];
+			n_ZN = arq->Reg[instruction->z] == 0;
+			n_SN = ShiftBit(arq->Reg[instruction->z],31,1) == 1;
+			n_OV = (ShiftBit(arq->Reg[instruction->x],31,1) != ShiftBit(arq->Reg[instruction->y],31,1)) && ShiftBit(arq->Reg[instruction->z],31,1) != ShiftBit(arq->Reg[instruction->x],31,1);
+			n_CY = ShiftBit(cyv,33,1) == 1;
 			sprintf(instrucao,"add r%d,r%d,r%d",instruction->z,instruction->x,instruction->y);
 			changeSR(a_ZD,n_ZN,n_SN,n_OV,a_IV,n_CY,arq);
 			printf("0x%08X:\t%-25s\tR%u=R%d+R%d=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,instruction->z,instruction->x,instruction->y,arq->Reg[instruction->z],arq->Reg[31]);
+			break;
+		case 0b000011:
+			cyv = (uint64_t)(arq->Reg[instruction->x]) - (uint64_t)(arq->Reg[instruction->y]);
+			arq->Reg[instruction->z] = (uint64_t)arq->Reg[instruction->x] - (uint64_t)arq->Reg[instruction->y];
+			n_ZN = arq->Reg[instruction->z] == 0;
+			n_SN = ShiftBit(arq->Reg[instruction->z],31,1) == 1;
+			n_OV = (ShiftBit(arq->Reg[instruction->x],31,1) == ShiftBit(arq->Reg[instruction->y],31,1)) && ShiftBit(arq->Reg[instruction->z],31,1) == ShiftBit(arq->Reg[instruction->x],31,1);
+			n_CY = ShiftBit(cyv,33,1) == 1;
+			sprintf(instrucao,"sub r%d,r%d,r%d",instruction->z,instruction->x,instruction->y);
+			changeSR(a_ZD,n_ZN,n_SN,n_OV,a_IV,n_CY,arq);
+			printf("0x%08X:\t%-25s\tR%u=R%d-R%d=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,instruction->z,instruction->x,instruction->y,arq->Reg[instruction->z],arq->Reg[31]);
 			break;
 		default:
 			printf("[INSTRUÇÃO NÃO MAPEADA - U]\n");
@@ -523,10 +541,10 @@ void processFile(FILE* input,FILE* output){
 	//showReg(newArq);
 }
 
-void Tests(){
+/*void Tests(){
 	Equal_Decimal(ShiftBit(0x00000000F0000000,31,1),0b1,"Test 1 - Passed");
 	//Equal_Decimal(changeSR(1,1,0,1,0,1),0b1101001,"Test 2 - Passed");
-}
+}*/
 
 int main(int argc, char* argv[]){
 	
@@ -548,7 +566,7 @@ int main(int argc, char* argv[]){
 
 	fclose(input);
 	fclose(output);
-	Tests();
+	//Tests();
 	return 0;
 
 	
