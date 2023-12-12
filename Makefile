@@ -11,4 +11,4 @@ $(EXEC): $(OBJ)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJ) $(EXEC)
+	rm -f *.o
