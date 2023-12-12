@@ -27,7 +27,7 @@ typedef struct typeS{
 
 ArqResources* inicialization(){
 	ArqResources* newArq = (ArqResources*)malloc(sizeof(ArqResources));
-	newArq->Mem = (uint32_t*)calloc(8,1024);
+	newArq->Mem = (uint32_t*)calloc(32,1024);
 	return newArq;
 }
 // OBS SR 6->ZN ,5->ZD, 4->SN , 3->OV, 2->IV , 1- --- , 0->CY;
@@ -78,7 +78,7 @@ char opcodeType(uint8_t op){
 void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 	switch(instruction->opcode){
 		char instrucao[30];
-		uint64_t cyv;
+		int64_t cyv;
 		uint8_t n_ZD;
 		uint8_t n_ZN;
 		uint8_t n_SN;
@@ -151,27 +151,46 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 			}
 			break;
 		case 0b000010:
-			cyv = (uint64_t)(arq->Reg[instruction->x]) + (uint64_t)(arq->Reg[instruction->y]);
+			cyv = (int64_t)((arq->Reg[instruction->x]) + (arq->Reg[instruction->y]));
 			arq->Reg[instruction->z] = (uint64_t)arq->Reg[instruction->x] + (uint64_t)arq->Reg[instruction->y];
 			n_ZN = arq->Reg[instruction->z] == 0;
-			n_SN = ShiftBit(arq->Reg[instruction->z],31,1) == 1;
-			n_OV = (ShiftBit(arq->Reg[instruction->x],31,1) != ShiftBit(arq->Reg[instruction->y],31,1)) && ShiftBit(arq->Reg[instruction->z],31,1) != ShiftBit(arq->Reg[instruction->x],31,1);
+			n_SN = ShiftBit(arq->Reg[instruction->z],32,1) == 1;
+			n_OV = (ShiftBit(arq->Reg[instruction->x],32,1) == ShiftBit(arq->Reg[instruction->y],32,1)) && ShiftBit(arq->Reg[instruction->z],32,1) != ShiftBit(arq->Reg[instruction->x],32,1);
 			n_CY = ShiftBit(cyv,33,1) == 1;
 			sprintf(instrucao,"add r%d,r%d,r%d",instruction->z,instruction->x,instruction->y);
 			changeSR(a_ZD,n_ZN,n_SN,n_OV,a_IV,n_CY,arq);
 			printf("0x%08X:\t%-25s\tR%u=R%d+R%d=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,instruction->z,instruction->x,instruction->y,arq->Reg[instruction->z],arq->Reg[31]);
 			break;
 		case 0b000011:
-			cyv = (uint64_t)(arq->Reg[instruction->x]) - (uint64_t)(arq->Reg[instruction->y]);
-			arq->Reg[instruction->z] = (uint64_t)arq->Reg[instruction->x] - (uint64_t)arq->Reg[instruction->y];
+			cyv = (int32_t)(arq->Reg[instruction->x]) - (int32_t)(arq->Reg[instruction->y]);
+			arq->Reg[instruction->z] = arq->Reg[instruction->x] - (int32_t)arq->Reg[instruction->y];
 			n_ZN = arq->Reg[instruction->z] == 0;
-			n_SN = ShiftBit(arq->Reg[instruction->z],31,1) == 1;
-			n_OV = (ShiftBit(arq->Reg[instruction->x],31,1) == ShiftBit(arq->Reg[instruction->y],31,1)) && ShiftBit(arq->Reg[instruction->z],31,1) == ShiftBit(arq->Reg[instruction->x],31,1);
+			n_SN = ShiftBit(arq->Reg[instruction->z],32,1) == 1;
+			n_OV = (ShiftBit(arq->Reg[instruction->x],32,1) != ShiftBit(arq->Reg[instruction->y],32,1)) && ShiftBit(arq->Reg[instruction->z],32,1) != ShiftBit(arq->Reg[instruction->x],32,1);
 			n_CY = ShiftBit(cyv,33,1) == 1;
+			printf("%d - %d = 0x%08X\n", (uint32_t)(arq->Reg[instruction->x]) ,(arq->Reg[instruction->y]),cyv);
 			sprintf(instrucao,"sub r%d,r%d,r%d",instruction->z,instruction->x,instruction->y);
 			changeSR(a_ZD,n_ZN,n_SN,n_OV,a_IV,n_CY,arq);
 			printf("0x%08X:\t%-25s\tR%u=R%d-R%d=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,instruction->z,instruction->x,instruction->y,arq->Reg[instruction->z],arq->Reg[31]);
 			break;
+		case 0b000100:
+			uint32_t id_op = ShiftBit(instruction->l,8,3);
+			if(id_op == 0b000){
+				cyv = (arq->Reg[instruction->x])*(arq->Reg[instruction->y]);
+				uint32_t L4 = ShiftBit(cyv,32,32);
+				uint32_t BitsMsig = ShiftBit(cyv,0,32);
+				uint32_t l4_0 = ShiftBit(instruction->l,0,5);
+				arq->Reg[l4_0] = L4;
+				arq->Reg[instruction->z] = BitsMsig;
+				n_CY = arq->Reg[l4_0] != 0;
+				n_ZN = cyv == 0;
+				sprintf(instrucao,"mul r%d,r%d,r%d,r%d",l4_0,instruction->z,instruction->x,instruction->y);
+				changeSR(a_ZD,n_ZN,a_SN,a_OV,a_IV,n_CY,arq);
+				printf("0x%08X:\t%-25s\tR%d:R%d=R%d*R%d=0x%016X,SR=0x%08X\n",arq->Reg[29],instrucao,l4_0,instruction->z,instruction->x,instruction->y,cyv,arq->Reg[31]);
+			}
+			break;
+
+
 		default:
 			printf("[INSTRUÇÃO NÃO MAPEADA - U]\n");
 			break;
