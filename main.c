@@ -32,7 +32,28 @@ ArqResources* inicialization(){
 }
 // OBS SR 6->ZN ,5->ZD, 4->SN , 3->OV, 2->IV , 1- --- , 0->CY;
 
-
+char* whyIsReg(ArqResources* arq, uint8_t pos){
+	char* res;
+	if(pos >= 28 && pos <= 31){
+		switch(pos){
+			case 28:
+				strcpy(res,"ir");
+				break;
+			case 29:
+				strcpy(res,"pc");
+				break;
+			case 30:
+				strcpy(res,"sp");
+				break;
+			case 31:
+				strcpy(res,"sr");
+				break;
+		}
+	} else {
+		sprintf(res,"r%d",pos);
+	}
+	return res;
+}
 
 uint32_t ShiftBit(uint32_t bits, uint8_t shift,uint8_t quantbits){
 	uint32_t molde = 0;
@@ -209,8 +230,30 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 				printf("sra\n");
 			}
 			break;
-
-
+		case 0b000101:
+			cyv = (int32_t)(arq->Reg[instruction->x]) - (int32_t)(arq->Reg[instruction->y]);
+			char res1[4];
+			char res2[4];
+			strcpy(res1,whyIsReg(arq,instruction->x));
+			strcpy(res2,whyIsReg(arq,instruction->y));
+			n_ZN = cyv == 0;
+			n_SN = ShiftBit(cyv,31,1) == 1;
+			n_OV = (ShiftBit(arq->Reg[instruction->x],31,1) != ShiftBit(arq->Reg[instruction->y],31,1)) && (ShiftBit(cyv,31,1) != ShiftBit(arq->Reg[instruction->x],31,1));
+			n_CY = ShiftBit(cyv,32,1) == 1;
+			changeSR(a_ZD,n_ZN,n_SN,n_OV,a_IV,n_CY,arq);
+			sprintf(instrucao,"cmp %s,%s",res1,res2);
+			printf("0x%08X:\t%-25s\tSR=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[31]);
+			break;
+		case 0b000110:
+			arq->Reg[instruction->z] = arq->Reg[instruction->x] & arq->Reg[instruction->y];
+			char res1[4];
+			char res2[4];
+			char res3[4];
+			strcpy(res1,whyIsReg(arq,instruction->x));
+			strcpy(res2,whyIsReg(arq,instruction->y));
+			strcpy(res3,whyIsReg(arq,instruction->z));
+			sprintf(instrucao,"and %s,%s,%s",res3,res1,res2);
+			printf("0x%08X:\t%-25s\t%S=%S&%S=0x%08X,SR=0x%08X",arq->Reg[29],instrucao,res3,res1,res2,arq->Reg[31]);
 		default:
 			printf("[INSTRUÇÃO NÃO MAPEADA - U]\n");
 			break;
@@ -518,7 +561,7 @@ void showMemory(ArqResources* arq){
 	printf("--------------------------------------------\n");
 	printf("                  Memória                   \n");
 	printf("--------------------------------------------\n");
-	for(int i = 0; i < 186; i = i + 1) {
+	for(int i = 0; i < 9100; i = i + 1) {
 		// Impressao lado a lado
 		printf("0x%08X: 0x%08X (0x%02X 0x%02X 0x%02X 0x%02X)\n", i << 2, arq->Mem[i], ((uint8_t*)(arq->Mem))[(i << 2) + 3], ((uint8_t*)(arq->Mem))[(i << 2) + 2], ((uint8_t*)(arq->Mem))[(i << 2) + 1], ((uint8_t*)(arq->Mem))[(i << 2) + 0]);
 	}
