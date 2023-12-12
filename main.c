@@ -168,7 +168,6 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 			n_SN = ShiftBit(arq->Reg[instruction->z],32,1) == 1;
 			n_OV = (ShiftBit(arq->Reg[instruction->x],32,1) != ShiftBit(arq->Reg[instruction->y],32,1)) && ShiftBit(arq->Reg[instruction->z],32,1) != ShiftBit(arq->Reg[instruction->x],32,1);
 			n_CY = ShiftBit(cyv,33,1) == 1;
-			printf("%d - %d = 0x%08X\n", (uint32_t)(arq->Reg[instruction->x]) ,(arq->Reg[instruction->y]),cyv);
 			sprintf(instrucao,"sub r%d,r%d,r%d",instruction->z,instruction->x,instruction->y);
 			changeSR(a_ZD,n_ZN,n_SN,n_OV,a_IV,n_CY,arq);
 			printf("0x%08X:\t%-25s\tR%u=R%d-R%d=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,instruction->z,instruction->x,instruction->y,arq->Reg[instruction->z],arq->Reg[31]);
@@ -177,7 +176,7 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 			uint32_t id_op = ShiftBit(instruction->l,8,3);
 			if(id_op == 0b000){
 				cyv = (arq->Reg[instruction->x])*(arq->Reg[instruction->y]);
-				uint32_t L4 = ShiftBit(cyv,32,32);
+				uint32_t L4 = ShiftBit(cyv,31,32);
 				uint32_t BitsMsig = ShiftBit(cyv,0,32);
 				uint32_t l4_0 = ShiftBit(instruction->l,0,5);
 				arq->Reg[l4_0] = L4;
@@ -187,6 +186,27 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 				sprintf(instrucao,"mul r%d,r%d,r%d,r%d",l4_0,instruction->z,instruction->x,instruction->y);
 				changeSR(a_ZD,n_ZN,a_SN,a_OV,a_IV,n_CY,arq);
 				printf("0x%08X:\t%-25s\tR%d:R%d=R%d*R%d=0x%016X,SR=0x%08X\n",arq->Reg[29],instrucao,l4_0,instruction->z,instruction->x,instruction->y,cyv,arq->Reg[31]);
+			}
+			if(id_op == 0b001){
+				printf("sll\n");
+			}
+			if(id_op == 0b010){
+				printf("muls\n");
+			}
+			if(id_op == 0b011){
+				printf("sla\n");
+			}
+			if(id_op == 0b100){
+				printf("div\n");
+			}
+			if(id_op == 0b101){
+				printf("srl\n");
+			}
+			if(id_op == 0b110){
+				printf("divs\n");
+			}
+			if(id_op == 0b111){
+				printf("sra\n");
 			}
 			break;
 
