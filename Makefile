@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11
 SRC = main.c test.c
-EXEC = PoximArq
+EXEC = ./bin/PoximArq
 OBJ = $(SRC:.c=.o)
 
 $(EXEC): $(OBJ)
