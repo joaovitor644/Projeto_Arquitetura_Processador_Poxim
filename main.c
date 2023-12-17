@@ -266,7 +266,16 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 				printf("0x%08X:\t%-25s\t%s:%s=%s:%s>>%d=0x%016X,SR=0x%08X\n",arq->Reg[29],instrucao,whyIsReg(instruction->z),whyIsReg(instruction->x),whyIsReg(instruction->z),whyIsReg(instruction->y),ShiftBit(instruction->l,0,5)+1,cyv,arq->Reg[31]);
 			}
 			if(id_op == 0b110){
-				printf("divs\n");
+				sprintf(instrucao,"divs %s,%s,%s,%s",whyIsReg(ShiftBit(instruction->l,0,5)),whyIsReg(instruction->z),whyIsReg(instruction->x),whyIsReg(instruction->y));
+				if(arq->Reg[instruction->y] != 0){
+					arq->Reg[ShiftBit(instruction->l,0,5)] = arq->Reg[instruction->x] % arq->Reg[instruction->y];
+					arq->Reg[instruction->z] = arq->Reg[instruction->x] / arq->Reg[instruction->y];
+				}
+				n_ZN = arq->Reg[instruction->z] == 0;
+				n_ZD = arq->Reg[instruction->y] == 0;
+				n_OV = arq->Reg[ShiftBit(instruction->l,0,5)] != 0;
+				changeSR(n_ZN,n_ZD,ShiftBit(arq->Reg[31],4,1),n_OV,ShiftBit(arq->Reg[31],2,1),ShiftBit(arq->Reg[31],0,1),arq);
+				printf("0x%08X:\t%-25s\t%s=%s%%%s=0x%08X,%s=%s/%s=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,whyIsReg(ShiftBit(instruction->l,0,5)),whyIsReg(instruction->x),whyIsReg(instruction->y),arq->Reg[ShiftBit(instruction->l,0,5)],whyIsReg(instruction->z),whyIsReg(instruction->x),whyIsReg(instruction->y),arq->Reg[instruction->z],arq->Reg[31]);
 			}
 			if(id_op == 0b111){
 				printf("sra\n");
