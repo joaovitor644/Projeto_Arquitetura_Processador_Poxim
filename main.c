@@ -59,6 +59,20 @@ char* whyIsReg(uint8_t pos,int8_t op){
 	}
 }
 
+uint8_t verifyPushList(uint32_t* list){
+	uint8_t i;
+	for(i = 0; i< 5 ;i++)
+		if(list[i] == 0)
+			break;
+	return i;
+}
+
+const char* whyIsRegHex(uint32_t reg) {
+    static char buffer[10];
+    sprintf(buffer, "0x%08X", reg);
+    return buffer;
+}
+
 uint32_t ShiftBit(uint32_t bits, uint8_t shift,uint8_t quantbits){
 	uint32_t molde = 0;
 	for (int i = 0; i < quantbits; i++) {
@@ -88,7 +102,7 @@ void changeSR(uint8_t ZN,uint8_t ZD,uint8_t SN,uint8_t OV,uint8_t IV,uint8_t CY,
 }
 
 char opcodeType(uint8_t op){
-	if(op <= 0b1001 && op >= 0b0000)
+	if(op <= 0b001011 && op >= 0b0000 )
 		return 'U';
 	else if((op <= 0b011101 && op >= 0b011000) || (op <= 0b010111 && op >= 0b010010))
 		return 'F';
@@ -282,6 +296,44 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 			sprintf(instrucao,"xor %s,%s,%s",whyIsReg(instruction->z,1),whyIsReg(instruction->x,1),whyIsReg(instruction->y,1));
 			printf("0x%08X:\t%-25s\t%s=%s^%s=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,whyIsReg(instruction->z,2),whyIsReg(instruction->x,2),whyIsReg(instruction->y,2),arq->Reg[instruction->z],arq->Reg[31]);
 			break;
+		case 0b001010:
+			uint32_t pushlist[] = {ShiftBit(instruction->l,6,5),ShiftBit(instruction->l,0,5),instruction->x,instruction->y,instruction->z};
+			uint8_t num = verifyPushList(pushlist);
+			if(num == 0){
+				sprintf(instrucao,"push -");
+				printf("0x%08X:\t%-25s\tMEM[0x%08X]{}={}\n",arq->Reg[29],instrucao,arq->Reg[30]);
+			} else {
+				char instrucao2[22];
+				char instrucao3[22];
+				char finalInstrucao[52];
+				char instrucaoValues[56];
+				if (num >= 1) {
+        			sprintf(instrucaoValues, "%s", whyIsRegHex(arq->Reg[pushlist[0]]));
+        			arq->Mem[arq->Reg[30] >> 2] = arq->Reg[pushlist[0]];
+        			arq->Reg[30] = arq->Reg[30] - 4;
+        			
+   				}
+			    for (int i = 1; i < num; ++i) {
+			        strcat(instrucaoValues, ",");
+			        strcat(instrucaoValues, whyIsRegHex(arq->Reg[pushlist[i]]));
+			        arq->Mem[arq->Reg[30] >> 2] = arq->Reg[pushlist[i]];
+			        arq->Reg[30] = arq->Reg[30] - 4;
+			    }
+				sprintf(instrucao,"push ");
+				if (num >= 1) {
+        			sprintf(instrucao2, "%s", whyIsReg(pushlist[0],1));
+        			sprintf(instrucao3,"%s",whyIsReg(pushlist[0],2));
+    			}
+    			for (int i = 1; i < num; ++i) {
+        			strcat(instrucao2, ",");
+        			strcat(instrucao3, ",");
+        			strcat(instrucao2, whyIsReg(pushlist[i],1));
+        			strcat(instrucao3, whyIsReg(pushlist[i],2));
+    			}
+    			sprintf(finalInstrucao,"%s%s",instrucao,instrucao2);
+    			printf("0x%08X:\t%-25s\tMEM[0x%08X]{%s}={%s}\n",arq->Reg[29],finalInstrucao,arq->Reg[30],instrucaoValues,instrucao3);
+			}
+			break;
 		default:
 			printf("[INSTRUÇÃO NÃO MAPEADA - U]\n");
 			break;
@@ -405,6 +457,13 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,uint32_t i){
 			uint8_t I15 = ShiftBit(instruction->i,15,1);
 			changeSR(CMPI == 0,ShiftBit(arq->Reg[31],5,1),CMPI31 == 1,(RegX31 != CMPI31) && (RegX31 != I15),ShiftBit(arq->Reg[31],2,1),ShiftBit(CMPI,32,1) == 1,arq);
 			printf("0x%08X:\t%-25s\tSR=0x%08x\n",arq->Reg[29],instrucao,arq->Reg[31]);
+			break;
+		case 0b011111:
+			sprintf(instrucao,"ret");
+			arq->Reg[30] = arq->Reg[30] + 4;
+			uint32_t oldPC = arq->Reg[29]; 
+			arq->Reg[29] = arq->Mem[arq->Reg[30] >> 4];
+			printf("0x%08X:\t%-25s\tPC=MEM[0x%08X]=0x%08X\n",oldPC,instrucao,arq->Reg[30],arq->Reg[29]);
 			break;
 		default:
 			printf("[INSTRUÇÃO NÃO MAPEADA - F - Opcode = 0x%08X]\n",instruction->opcode);
@@ -601,6 +660,7 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,uint32_t i){
 			
 			break;
 		default:
+			arq->Reg[29] = arq->Reg[29] + 4;
 			printf("[INSTRUÇÃO NÃO MAPEADA - S]\n");
 			break;
 	}
@@ -675,6 +735,7 @@ void processFile(FILE* input,FILE* output){
 			}
 		}else if(optype != 'U' && optype != 'F' && optype != 'S')	{
 			printf("[ERRO - INSTRUÇÃO NÃO ENCONTRADA]\n");
+			newArq->Reg[29] = newArq->Reg[29] + 4;
 		}
 
 		i++;
