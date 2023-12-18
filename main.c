@@ -59,7 +59,7 @@ char* whyIsReg(uint8_t pos,int8_t op){
 	}
 }
 
-uint8_t verifyPushList(uint32_t* list){
+uint8_t verifyList(uint32_t* list){
 	uint8_t i;
 	for(i = 0; i< 5 ;i++)
 		if(list[i] == 0)
@@ -127,6 +127,7 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 		char* res1;
 		char* res2;
 		char* res3;
+		int8_t num;
 		case 0b000000:
 			uint32_t xyl = arq->Reg[28] & 0x1FFFFF;
 			sprintf(instrucao, "mov %s,%d", whyIsReg(instruction->z,1), xyl);
@@ -298,7 +299,7 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 			break;
 		case 0b001010:
 			uint32_t pushlist[] = {ShiftBit(instruction->l,6,5),ShiftBit(instruction->l,0,5),instruction->x,instruction->y,instruction->z};
-			uint8_t num = verifyPushList(pushlist);
+			num = verifyList(pushlist);
 			if(num == 0){
 				sprintf(instrucao,"push -");
 				printf("0x%08X:\t%-25s\tMEM[0x%08X]{}={}\n",arq->Reg[29],instrucao,arq->Reg[30]);
@@ -308,16 +309,11 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
 				char finalInstrucao[52];
 				char instrucaoValues[56];
 				if (num >= 1) {
-        			sprintf(instrucaoValues, "%s", whyIsRegHex(arq->Reg[pushlist[0]]));
-        			arq->Mem[arq->Reg[30] >> 2] = arq->Reg[pushlist[0]];
-        			arq->Reg[30] = arq->Reg[30] - 4;
-        			
+        			sprintf(instrucaoValues, "%s", whyIsRegHex(arq->Reg[pushlist[0]]));    			
    				}
 			    for (int i = 1; i < num; ++i) {
 			        strcat(instrucaoValues, ",");
 			        strcat(instrucaoValues, whyIsRegHex(arq->Reg[pushlist[i]]));
-			        arq->Mem[arq->Reg[30] >> 2] = arq->Reg[pushlist[i]];
-			        arq->Reg[30] = arq->Reg[30] - 4;
 			    }
 				sprintf(instrucao,"push ");
 				if (num >= 1) {
@@ -332,10 +328,52 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i){
     			}
     			sprintf(finalInstrucao,"%s%s",instrucao,instrucao2);
     			printf("0x%08X:\t%-25s\tMEM[0x%08X]{%s}={%s}\n",arq->Reg[29],finalInstrucao,arq->Reg[30],instrucaoValues,instrucao3);
+			    for (int i = 0; i < num; ++i) {
+			        arq->Mem[arq->Reg[30] >> 2] = arq->Reg[pushlist[i]];
+			        arq->Reg[30] = arq->Reg[30] - 4;
+			    }
+			}
+			break;
+		case 0b001011:
+			uint32_t poplist[] = {ShiftBit(instruction->l,6,5),ShiftBit(instruction->l,0,5),instruction->x,instruction->y,instruction->z};
+			num = verifyList(poplist);
+			if(num == 0){
+				sprintf(instrucao,"pop -");
+				printf("0x%08X:\t%-25s\t{}=MEM[0x%08X]{}\n",arq->Reg[29],instrucao,arq->Reg[30]);
+			} else {
+				char instrucao2[22];
+				char instrucao3[22];
+				char finalInstrucao[52];
+				char instrucaoValues[56];
+				if (num >= 1) {
+        			sprintf(instrucaoValues, "%s", whyIsRegHex(arq->Reg[poplist[0]]));
+   				}
+			    for (int i = 1; i < num; ++i) {
+			        strcat(instrucaoValues, ",");
+			        strcat(instrucaoValues, whyIsRegHex(arq->Reg[poplist[i]]));
+			    }
+				sprintf(instrucao,"pop ");
+				if (num >= 1) {
+        			sprintf(instrucao2, "%s", whyIsReg(poplist[0],1));
+        			sprintf(instrucao3,"%s",whyIsReg(poplist[0],2));
+    			}
+    			for (int i = 1; i < num; ++i) {
+        			strcat(instrucao2, ",");
+        			strcat(instrucao3, ",");
+        			strcat(instrucao2, whyIsReg(poplist[i],1));
+        			strcat(instrucao3, whyIsReg(poplist[i],2));
+    			}
+    			sprintf(finalInstrucao,"%s%s",instrucao,instrucao2);
+    			printf("0x%08X:\t%-25s\t{%s}=MEM[0x%08X]{%s}\n",arq->Reg[29],finalInstrucao,instrucao3,arq->Reg[30],instrucaoValues);
+    			for (int i = 0; i < num; ++i) {
+			        arq->Reg[poplist[i]] = arq->Mem[arq->Reg[30] >> 2] ;
+        			arq->Reg[30] = arq->Reg[30] + 4;
+			    }
 			}
 			break;
 		default:
-			printf("[INSTRUÇÃO NÃO MAPEADA - U]\n");
+			arq->Reg[31] = 0xFFFFFFFF;
+			printf("[INVALID INSTRUCTION @ 0x%08X]\n",arq->Reg[29]);
 			break;
 	}
 }
@@ -466,7 +504,8 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,uint32_t i){
 			printf("0x%08X:\t%-25s\tPC=MEM[0x%08X]=0x%08X\n",oldPC,instrucao,arq->Reg[30],arq->Reg[29]);
 			break;
 		default:
-			printf("[INSTRUÇÃO NÃO MAPEADA - F - Opcode = 0x%08X]\n",instruction->opcode);
+			arq->Reg[31] = 0xFFFFFFFF;
+			printf("[INVALID INSTRUCTION @ 0x%08X]\n",arq->Reg[29]);
 			break;
 	}
 }
@@ -660,8 +699,8 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,uint32_t i){
 			
 			break;
 		default:
-			arq->Reg[29] = arq->Reg[29] + 4;
-			printf("[INSTRUÇÃO NÃO MAPEADA - S]\n");
+			arq->Reg[31] = 0xFFFFFFFF;
+			printf("[INVALID INSTRUCTION @ 0x%08X]\n",arq->Reg[29]);
 			break;
 	}
 }
@@ -715,6 +754,7 @@ void processFile(FILE* input,FILE* output){
 			newIU->z = (newArq->Reg[28] & (0b11111 << 21)) >> 21;
 			newIU->l = (newArq->Reg[28] & (0x7FF));
 			executionInstructionTypeU(newArq,newIU,i);
+			if(newArq->Reg[31] == 0xFFFFFFFF) break;
 			newArq->Reg[29] = newArq->Reg[29] + 4;
 		}
 		else if(optype == 'F'){
@@ -723,19 +763,21 @@ void processFile(FILE* input,FILE* output){
 			newIF->z = (newArq->Reg[28] & (0b11111 << 21)) >> 21;
 			newIF->i = (newArq->Reg[28] & (0xFFFF));
 			executionInstructionTypeF(newArq,newIF,i);
+			if(newArq->Reg[31] == 0xFFFFFFFF) break;
 			newArq->Reg[29] = newArq->Reg[29] + 4;
 		}
 		else if(optype == 'S'){
 			newIS->opcode = opcode;
 			newIS->i = (newArq->Reg[28] & (0b11111111111111111111111111));
 			executionInstructionTypeS(newArq,newIS,i);
+			if(newArq->Reg[31] == 0xFFFFFFFF) break;
 			if(opcode == 0b111111 && newIS->i == 0){
 				exec = 0;
 				break;
 			}
 		}else if(optype != 'U' && optype != 'F' && optype != 'S')	{
-			printf("[ERRO - INSTRUÇÃO NÃO ENCONTRADA]\n");
-			newArq->Reg[29] = newArq->Reg[29] + 4;
+			printf("[INVALID INSTRUCTION @ 0x%08X]\n",newArq->Reg[29]);
+			break;
 		}
 
 		i++;
