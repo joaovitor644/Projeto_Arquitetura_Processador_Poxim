@@ -104,7 +104,7 @@ void changeSR(uint8_t ZN,uint8_t ZD,uint8_t SN,uint8_t OV,uint8_t IV,uint8_t CY,
 char opcodeType(uint8_t op){
 	if(op <= 0b001011 && op >= 0b0000 )
 		return 'U';
-	else if((op <= 0b011101 && op >= 0b011000) || (op <= 0b010111 && op >= 0b010010))
+	else if((op <= 0b011101 && op >= 0b011000) || (op <= 0b010111 && op >= 0b010010) || op == 0b011110)
 		return 'F';
 	else if(op >= 0b101010 && op <= 0b111111)
 		return 'S';
@@ -503,6 +503,17 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,uint32_t i){
 			arq->Reg[29] = arq->Mem[arq->Reg[30] >> 4];
 			printf("0x%08X:\t%-25s\tPC=MEM[0x%08X]=0x%08X\n",oldPC,instrucao,arq->Reg[30],arq->Reg[29]);
 			break;
+		case 0b011110:
+			int64_t sinal2 = (((instruction->i & (0b1 << 15))>>15)) == 1? 0xFFFF << 15 : 0;
+			int32_t value = instruction->i + sinal2;
+			uint32_t oldpc = arq->Reg[29];
+			arq->Mem[arq->Reg[30] >> 2] = arq->Reg[29] + 4;
+			arq->Reg[30] = arq->Reg[30] - 4;
+			arq->Reg[29] = (arq->Reg[instruction->x] + value) << 2;
+			sprintf(instrucao,"call %d",value);
+	
+			printf("0x%08X:\t%-25s\tPC=0x%08X,MEM[0x%08X]=0x%08X\n",oldpc,instrucao,arq->Reg[29],arq->Reg[30],arq->Mem[arq->Reg[30] >> 2]);
+			break;
 		default:
 			arq->Reg[31] = 0xFFFFFFFF;
 			printf("[INVALID INSTRUCTION @ 0x%08X]\n",arq->Reg[29]);
@@ -698,6 +709,16 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,uint32_t i){
 			}
 			
 			break;
+		case 0b111001:
+			int64_t sinal2 = (((instruction->i & (0b1 << 25))>>25)) == 1? 0x3F << 26 : 0;
+			int64_t value = instruction->i + sinal2;
+			uint32_t oldpc = arq->Reg[29];
+			arq->Mem[arq->Reg[30] >> 2] = arq->Reg[29] + 4;
+			arq->Reg[30] = arq->Reg[30] - 4;
+			arq->Reg[29] = arq->Reg[29] + 4 + (value << 2);
+			sprintf(instrucao,"call %d",value);
+			printf("0x%08X:\t%-25s\tPC=0x%08X,MEM[0x%08X]=0x%08X\n",oldpc,instrucao,arq->Reg[29],arq->Reg[30],arq->Mem[arq->Reg[30] >> 2]);
+		break;
 		default:
 			arq->Reg[31] = 0xFFFFFFFF;
 			printf("[INVALID INSTRUCTION @ 0x%08X]\n",arq->Reg[29]);
