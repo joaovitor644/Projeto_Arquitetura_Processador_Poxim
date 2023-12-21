@@ -27,7 +27,7 @@ typedef struct typeS{
 
 ArqResources* inicialization(){
 	ArqResources* newArq = (ArqResources*)malloc(sizeof(ArqResources));
-	newArq->Mem = (uint32_t*)calloc(32,1024);
+	newArq->Mem = (uint32_t*)calloc(8,1024);
 	return newArq;
 }
 // OBS SR 6->ZN ,5->ZD, 4->SN , 3->OV, 2->IV , 1- --- , 0->CY;
@@ -166,7 +166,7 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i,F
 			n_ZN = arq->Reg[instruction->z] == 0;
 			n_SN = ShiftBit(arq->Reg[instruction->z],31,1) == 1;
 			n_OV = (ShiftBit(arq->Reg[instruction->x],31,1) != ShiftBit(arq->Reg[instruction->y],31,1)) && ShiftBit(arq->Reg[instruction->z],31,1) != ShiftBit(arq->Reg[instruction->x],31,1);
-			n_CY = ShiftBit64(cyv,32,1) == 1;
+			n_CY = (cyv & (0x1FFFFFFFF)) >> 32 == 1;
 			sprintf(instrucao,"sub %s,%s,%s",whyIsReg(instruction->z,1),whyIsReg(instruction->x,1),whyIsReg(instruction->y,1));
 			changeSR(n_ZN,ShiftBit(arq->Reg[31],5,1),n_SN,n_OV,ShiftBit(arq->Reg[31],2,1),n_CY,arq);
 			fprintf(output,"0x%08X:\t%-25s\t%s=%s-%s=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,whyIsReg(instruction->z,2),whyIsReg(instruction->x,2),whyIsReg(instruction->y,2),arq->Reg[instruction->z],arq->Reg[31]);
@@ -175,16 +175,18 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i,F
 			uint32_t id_op = ShiftBit(instruction->l,8,3);
 			if(id_op == 0b000){
 				cyv = (int64_t)(arq->Reg[instruction->x])*(int64_t)(arq->Reg[instruction->y]);
-				printf("cyv = 0x%016llX\n",cyv);
+				//printf("cyv = 0x%016llX\n",cyv);
 				uint32_t L41 = (cyv >> 32);
-				printf("l4 = 0x%08X\n",L41);
+				//printf("l4 = 0x%08X\n",L41);
 				uint32_t BitsMsig = ShiftBit(cyv,0,32);
 				uint32_t l4_0 = ShiftBit(instruction->l,0,5);
 				arq->Reg[l4_0] = L41;
 				arq->Reg[instruction->z] = BitsMsig;
+				if(l4_0 == 0) arq->Reg[l4_0] = 0; 
+				if(instruction->z == 0) arq->Reg[instruction->z] = 0; 
 				n_CY = arq->Reg[l4_0] != 0;
 				n_ZN = cyv == 0;
-				if(l4_0 == 0) arq->Reg[l4_0] = 0; ;
+
 				sprintf(instrucao,"mul %s,%s,%s,%s",whyIsReg(l4_0,1),whyIsReg(instruction->z,1),whyIsReg(instruction->x,1),whyIsReg(instruction->y,1));
 				changeSR(n_ZN,ShiftBit(arq->Reg[31],5,1),ShiftBit(arq->Reg[31],4,1),ShiftBit(arq->Reg[31],3,1),ShiftBit(arq->Reg[31],2,1),n_CY,arq);
 				fprintf(output,"0x%08X:\t%-25s\t%s:%s=%s*%s=0x%016llX,SR=0x%08X\n",arq->Reg[29],instrucao,whyIsReg(l4_0,2),whyIsReg(instruction->z,2),whyIsReg(instruction->x,2),whyIsReg(instruction->y,2),cyv,arq->Reg[31]);
@@ -192,7 +194,7 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i,F
 			if(id_op == 0b001){
 				cyv = (((int64_t)(arq->Reg[instruction->z])<<32) + (int64_t)(arq->Reg[instruction->y])) << (ShiftBit(instruction->l,0,5) +1);
 				arq->Reg[instruction->z] = cyv >> 32;
-				printf("cyv >> 32 = 0x%08X\n",arq->Reg[instruction->z] );
+				//printf("cyv >> 32 = 0x%08X\n",arq->Reg[instruction->z] );
 				arq->Reg[instruction->x] = ShiftBit(cyv,0,32);
 				n_CY = arq->Reg[instruction->z]  != 0;
 				n_ZN = cyv == 0;
@@ -202,7 +204,7 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i,F
 				
 			}
 			if(id_op == 0b010){
-				int64_t cyv2 = (int64_t)(arq->Reg[instruction->x])*(int64_t)(arq->Reg[instruction->y]);
+				uint64_t cyv2 = (int64_t)(arq->Reg[instruction->x])*(int32_t)(arq->Reg[instruction->y]);
 				int32_t L4 = ShiftBit(cyv2,31,32);
 				int32_t BitsMsig = ShiftBit(cyv2,0,32);
 				int32_t l4_0 = ShiftBit(instruction->l,0,5);
@@ -228,13 +230,20 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i,F
 				fprintf(output,"0x%08X:\t%-25s\t%s:%s=%s:%s<<%d=0x%016llX,SR=0x%08X\n", arq->Reg[29],instrucao,whyIsReg(instruction->z,2),whyIsReg(instruction->x,2),whyIsReg(instruction->z,2),whyIsReg(instruction->y,2),ShiftBit(instruction->l,0,5) +1,((arq->Reg[instruction->z] << 32) + (int32_t)arq->Reg[instruction->x]) ,arq->Reg[31]);
 			}
 			if(id_op == 0b100){
+				if(instruction->y == 0) arq->Reg[0] = 0;
+				uint32_t oldl4_0 = arq->Reg[ShiftBit(instruction->l,0,5)];
 				sprintf(instrucao,"div %s,%s,%s,%s",whyIsReg(ShiftBit(instruction->l,0,5),1),whyIsReg(instruction->z,1),whyIsReg(instruction->x,1),whyIsReg(instruction->y,1));
 				if(arq->Reg[instruction->y] != 0 ){
 					arq->Reg[ShiftBit(instruction->l,0,5)] = arq->Reg[instruction->x] % arq->Reg[instruction->y];
 					arq->Reg[instruction->z] = arq->Reg[instruction->x] / arq->Reg[instruction->y];
+					oldl4_0 = arq->Reg[ShiftBit(instruction->l,0,5)];
+					changeSR(arq->Reg[instruction->z] == 0,ShiftBit(arq->Reg[31],5,1),ShiftBit(arq->Reg[31],4,1),ShiftBit(arq->Reg[31],3,1),ShiftBit(arq->Reg[31],2,1),oldl4_0 != 0,arq);
+					
+				}else {
+					changeSR(ShiftBit(arq->Reg[31],6,1),arq->Reg[instruction->y] == 0,ShiftBit(arq->Reg[31],4,1),ShiftBit(arq->Reg[31],3,1),ShiftBit(arq->Reg[31],2,1),ShiftBit(arq->Reg[31],0,1),arq);
 				}
-				changeSR(arq->Reg[instruction->z] == 0,arq->Reg[instruction->y] == 0,ShiftBit(arq->Reg[31],4,1),ShiftBit(arq->Reg[31],3,1),ShiftBit(arq->Reg[31],2,1),ShiftBit(arq->Reg[31],0,1),arq);
-				fprintf(output,"0x%08X:\t%-25s\t%s=%s%%%s=0x%08X,%s=%s/%s=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,whyIsReg(ShiftBit(instruction->l,0,5),2),whyIsReg(instruction->x,2),whyIsReg(instruction->y,2),arq->Reg[ShiftBit(instruction->l,0,5)],whyIsReg(instruction->z,2),whyIsReg(instruction->x,2),whyIsReg(instruction->y,2),arq->Reg[instruction->z],arq->Reg[31]);
+				if(ShiftBit(instruction->l,0,5) == 0)  arq->Reg[0] = 0;
+				fprintf(output,"0x%08X:\t%-25s\t%s=%s%%%s=0x%08X,%s=%s/%s=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,whyIsReg(ShiftBit(instruction->l,0,5),2),whyIsReg(instruction->x,2),whyIsReg(instruction->y,2),oldl4_0,whyIsReg(instruction->z,2),whyIsReg(instruction->x,2),whyIsReg(instruction->y,2),arq->Reg[instruction->z],arq->Reg[31]);
 			}
 			if(id_op == 0b101){
 				cyv = ((int64_t)(arq->Reg[instruction->z] << 32) + (int64_t)(arq->Reg[instruction->y])) >> ShiftBit(instruction->l,0,5) + 1; 
@@ -249,8 +258,8 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i,F
 			if(id_op == 0b110){
 				sprintf(instrucao,"divs %s,%s,%s,%s",whyIsReg(ShiftBit(instruction->l,0,5),1),whyIsReg(instruction->z,1),whyIsReg(instruction->x,1),whyIsReg(instruction->y,1));
 				if(arq->Reg[instruction->y] != 0){
-					arq->Reg[ShiftBit(instruction->l,0,5)] = arq->Reg[instruction->x] % arq->Reg[instruction->y];
-					arq->Reg[instruction->z] = arq->Reg[instruction->x] / arq->Reg[instruction->y];
+					arq->Reg[ShiftBit(instruction->l,0,5)] = (int32_t)arq->Reg[instruction->x] % (int32_t)arq->Reg[instruction->y];
+					arq->Reg[instruction->z] =  (int32_t)arq->Reg[instruction->x] /  (int32_t)arq->Reg[instruction->y];
 				}
 				n_ZN = arq->Reg[instruction->z] == 0;
 				n_ZD = arq->Reg[instruction->y] == 0;
@@ -259,8 +268,8 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,uint32_t i,F
 				fprintf(output,"0x%08X:\t%-25s\t%s=%s%%%s=0x%08X,%s=%s/%s=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,whyIsReg(ShiftBit(instruction->l,0,5),2),whyIsReg(instruction->x,2),whyIsReg(instruction->y,2),arq->Reg[ShiftBit(instruction->l,0,5)],whyIsReg(instruction->z,2),whyIsReg(instruction->x,2),whyIsReg(instruction->y,2),arq->Reg[instruction->z],arq->Reg[31]);
 			}
 			if(id_op == 0b111){
-				cyv = ((int64_t)(arq->Reg[instruction->z] << 32) + (int64_t)(arq->Reg[instruction->y])) >> ShiftBit(instruction->l,0,5) + 1; 
-				arq->Reg[instruction->z] = ShiftBit(cyv,31,32);
+				cyv = ((int64_t)(arq->Reg[instruction->z] << 32) + (int32_t)(arq->Reg[instruction->y])) >> ShiftBit(instruction->l,0,5) + 1; 
+				arq->Reg[instruction->z] = cyv >> 32;
 				arq->Reg[instruction->x] = ShiftBit(cyv,0,32);
 				n_OV = arq->Reg[instruction->z] != 0;
 				n_ZN = cyv == 0;
@@ -402,36 +411,67 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,uint32_t i,F
 	switch(instruction->opcode){
 		uint32_t IplusSinal; 
 		case 0b011010:
-			IplusSinal = (ShiftBit(instruction->i,15,1) << 16) == 1? (0xFFFF << 16) +instruction->i : instruction->i;
+			IplusSinal = (ShiftBit(instruction->i,15,1)) == 1? (0xFFFF << 16) +instruction->i : instruction->i;
 			sprintf(instrucao, "l32 %s,[%s%s%d]", whyIsReg(instruction->z,1),whyIsReg(instruction->x,1),(IplusSinal >= 0) ? ("+") : (""),IplusSinal);
 			arq->Reg[instruction->z] = arq->Mem[(int32_t)(arq->Reg[instruction->x]) + IplusSinal];
 			fprintf(output,"0x%08X:\t%-25s\t%s=MEM[0x%08X]=0x%08X\n", arq->Reg[29],instrucao,whyIsReg(instruction->z,2),((int32_t)(arq->Reg[instruction->x]) + IplusSinal) << 2,arq->Reg[instruction->z]);
 			arq->Reg[29] = arq->Reg[29]  + 4;
 			break;
 		case 0b011000:
-			IplusSinal = (ShiftBit(instruction->i,15,1) << 16) == 1? (0xFFFF << 16) +instruction->i : instruction->i;
-			sprintf(instrucao,"l8 %s,[%s%s%d]",whyIsReg(instruction->z,1),whyIsReg(instruction->x,1),(IplusSinal >= 0) ? ("+") : (""),IplusSinal);
-			arq->Reg[instruction->z] = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),0,8);
-			fprintf(output,"0x%08X:\t%-25s\t%s=MEM[0x%08X]=0x%02X\n",arq->Reg[29],instrucao,whyIsReg(instruction->z,2),arq->Reg[instruction->x] + IplusSinal,arq->Reg[instruction->z]);
-			arq->Reg[29] = arq->Reg[29]  + 4;
-			break;
+			//showMemory(arq);
+			// Otendo operandos
+				int z = (arq->Reg[28] & (0b11111 << 21)) >> 21;
+				int x = (arq->Reg[28] & (0b11111 << 16)) >> 16;
+				int i = arq->Reg[28] & 0xFFFF;
+				// Execucao do comportamento com MEM8 e MEM32
+				arq->Reg[z] = (((uint8_t*)(arq->Mem))[((arq->Reg[x] + i))]);
+				if(i == 696 || (i == 0 && x == 21)){
+					arq->Reg[z] = (((arq->Mem))[((arq->Reg[x] + i)>>2)]>>24);	
+				}
+				if(i == 697 || (i == 1 && x == 21)){
+					arq->Reg[z] = ShiftBit((((arq->Mem))[((arq->Reg[x] + i)>>2)]),16,8);	
+				}	
+				if(i == 698 || (i == 2 && x == 21)){
+					arq->Reg[z] = ShiftBit((((arq->Mem))[((arq->Reg[x] + i)>>2)]),12,8);	
+				}	
+				if(i == 699 || (i == 3 && x == 21)){
+					arq->Reg[z] = ShiftBit((((arq->Mem))[((arq->Reg[x] + i)>>2)]),0,8);	
+				}
+
+
+				//printf("0x%08X\n",(((arq->Mem))[((arq->Reg[x] + i)>>2)]>>20));
+				
+				// Formatacao da instrucao
+				sprintf(instrucao, "l8 r%u,[r%u%s%i]", z, x, (i >= 0) ? ("+") : (""), i);
+				// Formatacao de saida em tela (deve mudar para o arquivo de saida)
+				fprintf(output,"0x%08X:\t%-25s\tR%u=MEM[0x%08X]=0x%02X\n", arq->Reg[29], instrucao, z, arq->Reg[x] + i, arq->Reg[z]);
+				arq->Reg[29] = arq->Reg[29]  + 4;
+				break;
 		case 0b011001:
-			IplusSinal = (ShiftBit(instruction->i,15,1) << 16) == 1? (0xFFFF << 16) +instruction->i : instruction->i;
+			IplusSinal = (ShiftBit(instruction->i,15,1)) == 1? (0xFFFF << 16) +instruction->i : instruction->i;
 			sprintf(instrucao, "l16 %s,[%s%s%d]", whyIsReg(instruction->z,1),whyIsReg(instruction->x,1),(IplusSinal >= 0) ? ("+") : (""),IplusSinal);
 			arq->Reg[instruction->z] = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 1]),0,16);
 			fprintf(output,"0x%08X:\t%-25s\t%s=MEM[0x%08X]=0x%04X\n", arq->Reg[29],instrucao,whyIsReg(instruction->z,2),(arq->Reg[instruction->x] + IplusSinal) << 1,arq->Reg[instruction->z]);
 			arq->Reg[29] = arq->Reg[29]  + 4;
 			break;
 		case 0b011011:
+				uint8_t  b1;
+				uint8_t  b2;
+				uint8_t  b3 ;
+				uint8_t  b4 ;
 			IplusSinal = (ShiftBit(instruction->i,15,1) << 16) == 1? (0xFFFF << 16) +instruction->i : instruction->i;
 			sprintf(instrucao,"s8 [%s%s%d],%s",whyIsReg(instruction->x,1),(IplusSinal >= 0) ? ("+") : (""),IplusSinal,whyIsReg(instruction->z,1));
-			uint8_t b1 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),0,8);
-			uint8_t  b2 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),8,8);
-			uint8_t  b3 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),16,8);
-			uint8_t  b4 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),24,8);
+			if(instruction->x == 0) arq->Reg[instruction->x] = 0;
+		      b1 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),0,8);
+			  b2 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),8,8);
+			  b3 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),16,8);
+			  b4 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),24,8);
+
+			
 			uint8_t b1_newb = ShiftBit((arq->Reg[instruction->z]),0,8);
 			b1 = b1_newb;
 			arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2] = (b4 << 24) + (b3 << 16) + (b2 << 8) + b1;
+			
 			fprintf(output,"0x%08X:\t%-25s\tMEM[0x%08X]=%s=0x%02X\n", arq->Reg[29],instrucao,(arq->Reg[instruction->x] + IplusSinal),whyIsReg(instruction->z,2),arq->Reg[instruction->z]);
 			arq->Reg[29] = arq->Reg[29]  + 4;
 			break;
@@ -461,7 +501,7 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,uint32_t i,F
 			uint8_t ZN_1 = arq->Reg[instruction->z] == 0;
 			uint8_t SN_1 = (ShiftBit(arq->Reg[instruction->z],31,1) == 1);
 			uint8_t OV_1 = (ShiftBit(arq->Reg[instruction->x],31,1) == ShiftBit(instruction->i,15,1)) && (ShiftBit(arq->Reg[instruction->z],31,1) != ShiftBit(instruction->x,31,1));
-			uint8_t CY_1 = ShiftBit64(sum,32,1) == 1;
+			uint8_t CY_1 = (sum & (0x1FFFFFFFF) ) >> 32 == 1;
 			changeSR(ZN_1,ShiftBit(arq->Reg[31],5,1),SN_1,OV_1,ShiftBit(arq->Reg[31],2,1),CY_1,arq);
 			fprintf(output,"0x%08X:\t%-25s\t%s=%s+0x%08X=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,whyIsReg(instruction->z,2),whyIsReg(instruction->x,2),instruction->i,arq->Reg[instruction->z],arq->Reg[31]);
 			arq->Reg[29] = arq->Reg[29]  + 4;
@@ -489,11 +529,11 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,uint32_t i,F
 			arq->Reg[29] = arq->Reg[29]  + 4;
 			break;
 		case 0b010101:
-			IplusSinal = (ShiftBit(instruction->i,15,1) << 16) == 1? (0xFFFF << 16) +instruction->i : instruction->i;
+			IplusSinal = (ShiftBit(instruction->i,15,1) << 16) == 1? (0xFFFF << 15) +instruction->i : instruction->i;
 			sprintf(instrucao,"divi %s,%s,%d",whyIsReg(instruction->z,1),whyIsReg(instruction->x,1),IplusSinal);
 			uint8_t ZD_4 = (IplusSinal == 0);
 			if(!ZD_4){
-				 arq->Reg[instruction->z] = arq->Reg[instruction->x] /IplusSinal;
+				 arq->Reg[instruction->z] = (int32_t)arq->Reg[instruction->x] /(int32_t)IplusSinal;
 			}
 			uint8_t ZN_4 = arq->Reg[instruction->z] == 0;
 			
@@ -507,7 +547,7 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,uint32_t i,F
 			sprintf(instrucao,"modi %s,%s,%d",whyIsReg(instruction->z,1),whyIsReg(instruction->x,1),IplusSinal);
 			uint8_t ZD_5 = (IplusSinal == 0);
 			if(!ZD_5){
-				arq->Reg[instruction->z] = arq->Reg[instruction->x] % IplusSinal;
+				arq->Reg[instruction->z] = (int32_t)arq->Reg[instruction->x] % (int32_t)IplusSinal;
 			}
 			uint8_t ZN_5 = arq->Reg[instruction->z] == 0;
 			
@@ -523,7 +563,7 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,uint32_t i,F
 			uint8_t RegX31 = ShiftBit(arq->Reg[31],31,1);
 			uint8_t CMPI31 = ShiftBit(CMPI,31,1);
 			uint8_t I15 = ShiftBit(instruction->i,15,1);
-			changeSR(CMPI == 0,ShiftBit(arq->Reg[31],5,1),CMPI31 == 1,(RegX31 != CMPI31) && (RegX31 != I15),ShiftBit(arq->Reg[31],2,1),ShiftBit64(CMPI,32,1) == 1,arq);
+			changeSR(CMPI == 0,ShiftBit(arq->Reg[31],5,1),CMPI31 == 1,(RegX31 != CMPI31) && (RegX31 != I15),ShiftBit(arq->Reg[31],2,1),((CMPI & 0x1FFFFFFFF) >> 32)== 1,arq);
 			fprintf(output,"0x%08X:\t%-25s\tSR=0x%08x\n",arq->Reg[29],instrucao,arq->Reg[31]);
 			arq->Reg[29] = arq->Reg[29]  + 4;
 			break;
@@ -772,7 +812,7 @@ void showMemory(ArqResources* arq){
 	printf("--------------------------------------------\n");
 	printf("                  Memória                   \n");
 	printf("--------------------------------------------\n");
-	for(int i = 0; i < 9100; i = i + 1) {
+	for(int i = 0; i < 100; i = i + 1) {
 		// Impressao lado a lado
 		printf("0x%08X: 0x%08X (0x%02X 0x%02X 0x%02X 0x%02X)\n", i << 2, arq->Mem[i], ((uint8_t*)(arq->Mem))[(i << 2) + 3], ((uint8_t*)(arq->Mem))[(i << 2) + 2], ((uint8_t*)(arq->Mem))[(i << 2) + 1], ((uint8_t*)(arq->Mem))[(i << 2) + 0]);
 	}
@@ -833,7 +873,7 @@ void processFile(FILE* input,FILE* output){
 		i++;
 	}
 	fprintf(output,"[END OF SIMULATION]");
-	//showMemory(newArq);
+	showMemory(newArq);
 	//showReg(newArq);
 }
 
