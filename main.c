@@ -30,7 +30,6 @@ ArqResources* inicialization(){
 	newArq->Mem = (uint32_t*)calloc(32,1024);
 	return newArq;
 }
-// OBS SR 6->ZN ,5->ZD, 4->SN , 3->OV, 2->IV , 1- --- , 0->CY;
 
 char* whyIsReg(uint8_t pos,int8_t op){
 	char* res = (char*)malloc(sizeof(4));
@@ -780,29 +779,6 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,FILE* output
 			fprintf(output,"[INVALID INSTRUCTION @ 0x%08X]\n",arq->Reg[29]);
 			break;
 	}
-}
-
-void showReg(ArqResources* arq){
-	for(int i = 0; i < 26;i++){
-		printf("R[%d] = 0x%08X\n",i,arq->Reg[i]);
-	}
-	printf("==============================\n");
-	printf("IR = 0x%08X\n",arq->Reg[28]);
-	printf("PC = 0x%08X\n",arq->Reg[29]);
-	printf("SP = 0x%08X\n",arq->Reg[30]);
-	printf("SR = 0x%08X\n",arq->Reg[31]);
-	printf("==============================\n");
-}
-
-void showMemory(ArqResources* arq){
-	printf("--------------------------------------------\n");
-	printf("                  Memória                   \n");
-	printf("--------------------------------------------\n");
-	for(int i = 0; i < 170; i = i + 1) {
-		// Impressao lado a lado
-		printf("0x%08X: 0x%08X (0x%02X 0x%02X 0x%02X 0x%02X)\n", i << 2, arq->Mem[i], ((uint8_t*)(arq->Mem))[(i << 2) + 3], ((uint8_t*)(arq->Mem))[(i << 2) + 2], ((uint8_t*)(arq->Mem))[(i << 2) + 1], ((uint8_t*)(arq->Mem))[(i << 2) + 0]);
-	}
-	printf("--------------------------------------------\n");
 }
 
 void processFile(FILE* input,FILE* output){
