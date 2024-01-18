@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <dirent.h>
 
 typedef struct ArqResources{
 	uint32_t* Mem;
@@ -781,10 +782,82 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction){
 	}
 }
 
-void processFile(int32_t i,ArqResources* newArq){
-	
-		//printf("passou\n");
-		newArq->Reg[28] = newArq->Mem[i];
+void showReg(ArqResources* arq) {
+    for (int i = 0; i < 26; i++) {
+        printf("R[%d] = 0x%08X\n", i, arq->Reg[i]);
+    }
+    printf("==============================\n");
+    printf("| IR = 0x%08X\n", arq->Reg[28]);
+    printf("| PC = 0x%08X\n", arq->Reg[29]);
+    printf("| SP = 0x%08X\n", arq->Reg[30]);
+    printf("| SR = 0x%08X\n", arq->Reg[31]);
+    printf("==============================\n");
+}
+
+void showMemory(ArqResources* arq,int ini,int end) {
+    printf("--------------------------------------------\n");
+    printf("|                 Memória                  |\n");
+    printf("--------------------------------------------\n");
+    for (int i = ini; i < end; i = i + 1) {
+        // Impressao lado a lado
+        printf("0x%08X: 0x%08X (0x%02X 0x%02X 0x%02X 0x%02X)\n", i << 2, arq->Mem[i], ((uint8_t*)(arq->Mem))[(i << 2) + 3], ((uint8_t*)(arq->Mem))[(i << 2) + 2], ((uint8_t*)(arq->Mem))[(i << 2) + 1], ((uint8_t*)(arq->Mem))[(i << 2) + 0]);
+    }
+    printf("--------------------------------------------\n");
+}
+
+void showPrograms() {
+    DIR *directory;
+    struct dirent *entry;
+    printf("------------------------------\n");
+    printf("|           Programs         |\n");
+    printf("------------------------------\n");
+    directory = opendir("./inputs/");
+    while ((entry = readdir(directory)) != NULL) {
+        // Ignora os diretórios "." e ".."
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        // Forma o caminho completo do arquivo
+        char filePath[256];
+        snprintf(filePath, sizeof(filePath), "./inputs/%s", entry->d_name);
+
+        // Abre o arquivo
+        FILE *file = fopen(filePath, "r");
+        if (file == NULL) {
+            perror("Erro ao abrir o arquivo");
+            continue;
+        }
+
+        // Conta as linhas
+        int lineCount = 0;
+        char buffer[256];
+        while (fgets(buffer, sizeof(buffer), file) != NULL) {
+            lineCount++;
+        }
+
+        // Exibe as informações
+        printf("| %s  %d linhas\n", entry->d_name,lineCount);
+        printf("------------------------------\n");
+
+        // Fecha o arquivo
+        fclose(file);
+    }
+
+    closedir(directory);
+}
+
+void executeProgram(ArqResources* newArq,FILE* input){
+	uint8_t i = 0;
+	while(!feof(input)){
+		fscanf(input,"0x%8X\n",&newArq->Mem[i]);
+		i++;
+	}
+	i = 0;
+	uint8_t exec = 1;
+	printf("[START OF SIMULATION]\n");
+	while(exec){
+		newArq->Reg[28] = newArq->Mem[newArq->Reg[29] >> 2];
 		uint8_t opcode = (newArq->Reg[28] & (0b111111 << 26)) >> 26;
 		char optype = opcodeType(opcode);
 		typeU* newIU = malloc(sizeof(typeU));
@@ -811,31 +884,73 @@ void processFile(int32_t i,ArqResources* newArq){
 			newIS->i = (newArq->Reg[28] & (0b11111111111111111111111111));			
 			executionInstructionTypeS(newArq,newIS);
 			if(opcode == 0b111111 && newIS->i == 0){
-			
+				exec = 0;
+				break;
 			}
 		}else if(optype != 'U' && optype != 'F' && optype != 'S')	{
 			printf("[INVALID INSTRUCTION @ 0x%08X]\n",newArq->Reg[29]);
-		
+			break;
 		}
-	
+		i++;
+	}
+	printf("[END OF SIMULATION]\n");
 
 }
 
 
+void processCommand(char* command, ArqResources* arq) {
+
+    char cmd[20];
+    char param[20];
+    int n;
+    if (sscanf(command, "%19[^(](%19[^)])", cmd, param) == 2 || sscanf(command, "%19[^(](%19[^)])", cmd, param) == 1 ) {
+    	char* token = strtok(param, ",");
+        char** listParam;
+        int32_t* listParamInt;
+        n = 0;
+        if(strcmp(cmd,"showMemory") == 0){
+        	listParamInt = (int32_t*)malloc(sizeof(int32_t)*2);
+        	int32_t value;
+        	while (token != NULL) {
+        		if (sscanf(token, "%d", &value) == 1) {
+                	listParamInt[n] = value;
+                	n++;
+            	} else {
+                	printf("Erro ao converter para inteiro: %s\n", token);
+            	}
+            	token = strtok(NULL, ",");
+        	}
+        	showMemory(arq,listParamInt[0],listParamInt[1]);
+        } if(strcmp(cmd,"showPrograms") == 0){
+        	showPrograms();
+        }
+        if(strcmp(cmd,"executeProgram") == 0){
+        	char* in;
+        	sprintf(in,"inputs/%s",param);
+        	FILE* input = fopen(in,"r");
+        	printf("%s\n",in);
+        	executeProgram(arq,input);
+        }
+        if(strcmp(cmd,"clear") == 0){
+        	system("clear");
+        }
+        if(strcmp(cmd,"showReg") == 0){
+        	showReg(arq);
+        }
+    }
+
+}
+
 int main(){
-	int32_t instruction;
+	char instruction[100];
 	ArqResources* newArq = inicialization();
-	int i = 0;
 	system("clear");
 	while(1){
 		printf("poxim V1.0 >");
-		scanf("0x%8X",&instruction);
-		newArq->Mem[i] = instruction;
+		scanf("%99[^\n]", instruction);
+       
+		processCommand(instruction,newArq);
 		while (getchar() != '\n');
-		if(instruction == 0) break;
-		processFile(i,newArq);
-		instruction = 0;
-		i++;
 	}
 	
 	return 0;
