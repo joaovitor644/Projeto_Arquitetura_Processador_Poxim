@@ -562,6 +562,19 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction){
 			arq->Reg[29] = arq->Mem[arq->Reg[30] >> 2];
 			printf("0x%08X:\t%-25s\tPC=MEM[0x%08X]=0x%08X\n",oldPC,instrucao,arq->Reg[30],arq->Reg[29]);
 			break;
+		case 0b100000:
+			sprintf(instrucao,"reti");
+			arq->Reg[30] = arq->Reg[30] + 4;
+			arq->Reg[27] = arq->Mem[arq->Reg[30]];
+			uint32_t ipc = arq->Reg[30];
+			arq->Reg[30] = arq->Reg[30] + 4;
+			arq->Reg[26] = arq->Mem[arq->Reg[30]];
+			uint32_t cr = arq->Reg[30];
+			arq->Reg[30] = arq->Reg[30] + 4;
+			uint32_t oldPC = arq->Reg[29]; 
+			arq->Reg[29] = arq->Mem[arq->Reg[30]];
+			printf("0x%08X:\t%-25s\tIPC=MEM[0x%08X]=0x%08X,CR=MEM[0x%08X]=0x%08X,PC=MEM[0x%08x]=0X%08x\n",oldPC,instrucao,ipc,arq->Reg[27],cr,arq->Reg[30],arq->Reg[30]);
+			break;
 		case 0b011110:
 			int64_t sinal2 = (((instruction->i & (0b1 << 15))>>15)) == 1? 0xFFFF << 15 : 0;
 			int32_t value = instruction->i + sinal2;
