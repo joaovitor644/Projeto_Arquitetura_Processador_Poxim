@@ -32,6 +32,10 @@ ArqResources* inicialization(){
 	return newArq;
 }
 
+void changerValue(uint32_t* value,uint8_t pos,uint8_t v){
+	*value = *value | (v << pos);
+}
+
 char* whyIsReg(uint8_t pos,int8_t op){
 	char* res = (char*)malloc(sizeof(4));
 	if(pos >= 28 && pos <= 31){
@@ -111,7 +115,7 @@ void changeSR(uint8_t ZN,uint8_t ZD,uint8_t SN,uint8_t OV,uint8_t IV,uint8_t CY,
 char opcodeType(uint8_t op){
 	if(op <= 0b001011)
 		return 'U';
-	else if(op >= 0b010010 && op <= 0b011111)
+	else if(op >= 0b010010 && op <= 0b011111 || op == 0b100000 || op == 0b100001)
 		return 'F';
 	else if((op >= 0b101010 && op <= 0b111001) || op == 0b111111)
 		return 'S';
@@ -562,6 +566,7 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction){
 			arq->Reg[29] = arq->Mem[arq->Reg[30] >> 2];
 			printf("0x%08X:\t%-25s\tPC=MEM[0x%08X]=0x%08X\n",oldPC,instrucao,arq->Reg[30],arq->Reg[29]);
 			break;
+			//new
 		case 0b100000:
 			sprintf(instrucao,"reti");
 			arq->Reg[30] = arq->Reg[30] + 4;
@@ -571,9 +576,9 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction){
 			arq->Reg[26] = arq->Mem[arq->Reg[30]];
 			uint32_t cr = arq->Reg[30];
 			arq->Reg[30] = arq->Reg[30] + 4;
-			uint32_t oldPC = arq->Reg[29]; 
+			uint32_t oldPC2 = arq->Reg[29]; 
 			arq->Reg[29] = arq->Mem[arq->Reg[30]];
-			printf("0x%08X:\t%-25s\tIPC=MEM[0x%08X]=0x%08X,CR=MEM[0x%08X]=0x%08X,PC=MEM[0x%08x]=0X%08x\n",oldPC,instrucao,ipc,arq->Reg[27],cr,arq->Reg[30],arq->Reg[30]);
+			printf("0x%08X:\t%-25s\tIPC=MEM[0x%08X]=0x%08X,CR=MEM[0x%08X]=0x%08X,PC=MEM[0x%08x]=0X%08x\n",oldPC2,instrucao,ipc,arq->Reg[27],cr,arq->Reg[30],arq->Reg[30]);
 			break;
 		case 0b011110:
 			int64_t sinal2 = (((instruction->i & (0b1 << 15))>>15)) == 1? 0xFFFF << 15 : 0;
@@ -584,6 +589,18 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction){
 			arq->Reg[29] = (arq->Reg[instruction->x] + value) << 2;		
 			printf("0x%08X:\t%-25s\tPC=0x%08X,MEM[0x%08X]=0x%08X\n",oldpc,instrucao,arq->Reg[29],arq->Reg[30],arq->Mem[arq->Reg[30] >> 2]);
 			arq->Reg[30] = arq->Reg[30] - 4;
+			break;
+			//new
+		case 0b100001:
+			if(instruction->i == 0){
+				sprintf(instrucao,"cbr %s[%d]",whyIsReg(instruction->z,1),instruction->x);
+				changerValue(&arq->Reg[instruction->z],instruction->x,0);
+				printf("0x%08X:\t%-25s\t%s=%s\n",arq->Reg[29],instrucao,whyIsReg(instruction->z,2),whyIsRegHex(instruction->z));
+			}else{
+				sprintf(instrucao,"sbr %s[%d]",whyIsReg(instruction->z,1),instruction->x);
+				changerValue(&arq->Reg[instruction->z],instruction->x,1);
+				printf("0x%08X:\t%-25s\t%s=%s\n",arq->Reg[29],instrucao,whyIsReg(instruction->z,2),whyIsRegHex(instruction->z));
+			}
 			break;
 		default:
 			changeSR(ShiftBit(arq->Reg[31],6,1),ShiftBit(arq->Reg[31],5,1),ShiftBit(arq->Reg[31],4,1),ShiftBit(arq->Reg[31],3,1),1,ShiftBit(arq->Reg[31],0,1),arq);
@@ -607,10 +624,24 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction){
 				arq->Reg[29] = arq->Reg[29] + 4*IplusSinal + 4;
 			}
 			break;
+			//new
 		case 0b111111:
 			IplusSinal = (ShiftBit(instruction->i,25,1) << 6) == 1? (0x3F << 25) +instruction->i : instruction->i;
 			sprintf(instrucao, "int %d", IplusSinal);
 			printf("0x%08X:\t%-25s\tCR=0x%08X,PC=0x%08x\n", arq->Reg[29],instrucao,0,0);
+			arq->Mem[arq->Reg[30]] = arq->Reg[29] + 4;
+			arq->Reg[30] = arq->Reg[30] - 4;
+			arq->Mem[arq->Reg[30]] = arq->Reg[26];
+			arq->Reg[30] = arq->Reg[30] - 4;
+			arq->Mem[arq->Reg[30]] = arq->Reg[27];
+			arq->Reg[30] = arq->Reg[30] - 4;
+
+			if(IplusSinal != 0){
+				arq->Reg[26] = instruction->i;
+				arq->Reg[27] = arq->Reg[29];
+				arq->Reg[29] = 0x0000000C;
+				printf("[SOFTWARE INTERRUPTION]\n");
+			}
 			break;
 		case 0b101010:
 			IplusSinal = (ShiftBit(instruction->i,25,1) << 6) == 1? (0x3F << 25) +instruction->i : instruction->i;
