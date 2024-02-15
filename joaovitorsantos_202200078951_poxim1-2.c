@@ -334,11 +334,11 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,FILE* output
 				//printf("y = 0x%08X\n", (int32_t)(arq->Reg[instruction->y]) );
 				//printf("z = 0x%016lX\n", (int64_t)(arq->Reg[instruction->z] << 32) );
 				if(instruction->z == 0){
-					//printf("p1\n");
-					cyv = (int32_t)(arq->Reg[instruction->y]) >> (ShiftBit(instruction->l,0,5) + 1);
+					//printf("p2\n");
+					cyv = (int64_t)(arq->Reg[instruction->y]) >> (ShiftBit(instruction->l,0,5) + 1);
 					//printf("cyv = 0x%016lX\n",cyv);
 				} else {
-					//printf("p1\n");
+					printf("p1\n");
 					cyv = ((int64_t)(arq->Reg[instruction->z] << 32) + (int32_t)(arq->Reg[instruction->y])) >> (ShiftBit(instruction->l,0,5) + 1);
 				}
 				//cyv = ((int64_t)(arq->Reg[instruction->z] << 32) + (int32_t)(arq->Reg[instruction->y])) >> (ShiftBit(instruction->l,0,5) + 1);
@@ -805,7 +805,10 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,FILE* output
 			IplusSinal = (ShiftBit(instruction->i,25,1) << 6) == 1? (0x3F << 25) +instruction->i : instruction->i;
 			sprintf(instrucao, "int %d", IplusSinal);
 			//printf("atual ---> 0x%08X\n",arq->Reg[30]);
-			arq->Mem[arq->Reg[30]] = arq->Reg[29] + 4;
+			
+			//printf("0x%08X\n",arq->Reg[30]);
+			if(IplusSinal != 0){
+				arq->Mem[arq->Reg[30]] = arq->Reg[29] + 4;
 			arq->Reg[30] = arq->Reg[30] - 4;
 			//printf("0x%08X\n",arq->Reg[30]);
 			arq->Mem[arq->Reg[30]] = arq->Reg[26];
@@ -813,14 +816,14 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,FILE* output
 			//printf("0x%08X\n",arq->Reg[30]);
 			arq->Mem[arq->Reg[30]] = arq->Reg[27];
 			arq->Reg[30] = arq->Reg[30] - 4;
-			//printf("0x%08X\n",arq->Reg[30]);
-			if(IplusSinal != 0){
 				arq->Reg[26] = instruction->i;
 				arq->Reg[27] = arq->Reg[29];
 				arq->Reg[29] = 0x0000000C;
 				fprintf(output,"0x%08X:\t%-25s\tCR=0x%08X,PC=0x%08X\n", arq->Reg[29],instrucao,arq->Reg[26],arq->Reg[29]);
 				fprintf(output,"[SOFTWARE INTERRUPTION]\n");
 			} else {
+				uint32_t oldpc = arq->Reg[29];
+				arq->Reg[29] = 0;
 				fprintf(output,"0x%08X:\t%-25s\tCR=0x%08X,PC=0x%08X\n", arq->Reg[29],instrucao,arq->Reg[26],arq->Reg[29]);
 			}
 			break;
@@ -1030,6 +1033,7 @@ void processFile(FILE* input,FILE* output){
 	uint8_t exec = 1;
 	fprintf(output,"[START OF SIMULATION]\n");
 	while(exec){
+		//printf("teste\n");
 		if(newArq->watchCount == 0 && newArq->setWatchdog == 1){
 			fprintf(output,"[HARDWARE INTERRUPTION 1]\n");
 			newArq->setWatchdog = 0;
