@@ -8,6 +8,7 @@ typedef struct FPU{
 	float y;
 	float z;
 	uint32_t OPST;
+  uint32_t cicle;
 }FPU;
 
 typedef struct Terminal{
@@ -58,6 +59,12 @@ ArqResources* inicialization(){
 	Watchdog* newW = (Watchdog*)malloc(sizeof(Watchdog));
 	Terminal* newT = (Terminal*)malloc(sizeof(Terminal));
 	FPU* newF = (FPU*)malloc(sizeof(FPU));
+
+  newF->x = 0;
+  newF->y = 0;
+  newF->z = 0;
+  newF->OPST = 0;
+  newF->cicle = 0;
 
 	newT->term = 0;
 	newT->index = 0;
@@ -126,7 +133,7 @@ uint32_t ShiftBit(uint32_t bits, uint8_t shift,uint8_t quantbits){
 	for (int i = 0; i < quantbits; i++) {
         molde |= (1u << i);
     }
-	return (bits & (molde << shift)) >> shift;
+	return (bits & (/molde << shift)) >> shift;
 }
 uint32_t ShiftBit64(uint64_t bits, uint8_t shift,uint8_t quantbits){
 	uint32_t molde = 0;
@@ -597,7 +604,9 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
 				}
 				fprintf(output,"0x%08X:\t%-25s\tMEM[0x%08X]=%s=0x%02X\n", arq->Reg[29],instrucao,(arq->Reg[instruction->x] + IplusSinal),whyIsReg(instruction->z,2),arq->Reg[instruction->z]);
 				arq->Reg[29] = arq->Reg[29]  + 4;
-			} else {
+			} else if(arq->Reg[instruction->x] + IplusSinal == 0x8080888F){
+        
+      } else {
 				b1 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),0,8);
 			 	b2 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),8,8);
 			 	b3 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),16,8);
@@ -629,8 +638,15 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
 				arq->wdog->setWatchdog =  ShiftBit(arq->Reg[instruction->z],31,1);
 				fprintf(output,"0x%08X:\t%-25s\tMEM[0x%08X]=%s=0x%08X\n", arq->Reg[29],instrucao,(arq->Reg[instruction->x] + IplusSinal) << 2,whyIsReg(instruction->z,2),arq->Reg[instruction->z]);
 				arq->Reg[29] = arq->Reg[29]  + 4;
-			} else {
-
+			}else if(((arq->Reg[instruction->x] + IplusSinal) << 2) == 0x80808880){
+        
+      }else if(((arq->Reg[instruction->x] + IplusSinal) << 2) == 0x80808884){
+        
+      }else if(((arq->reg[instruction->x] + IplusSinal) << 2) == 0x80808888){
+          
+      }else if(((arq->Reg[instruction->x] + IplusSinal) << 2) == 0x8888888B){
+          
+      } else {
 				arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2] = arq->Reg[instruction->z];
 				fprintf(output,"0x%08X:\t%-25s\tMEM[0x%08X]=%s=0x%08X\n", arq->Reg[29],instrucao,(arq->Reg[instruction->x] + IplusSinal) << 2,whyIsReg(instruction->z,2),arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]);
 				arq->Reg[29] = arq->Reg[29]  + 4;
