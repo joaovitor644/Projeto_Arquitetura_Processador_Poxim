@@ -5,8 +5,8 @@
 #include <math.h>
 
 typedef struct FPU{
-	uint32_t  x;
-	uint32_t  y;
+	float  x;
+	float  y;
 	uint32_t  z;
 	uint32_t OPST;
   uint32_t cicle;
@@ -176,13 +176,13 @@ char opcodeType(uint8_t op){
 		return 'E';
 }
 
-int calcular_ciclos(uint32_t  valor_hex_x, uint32_t  valor_hex_y) {
-	printf("x real = 0x%08X\n",valor_hex_x);
-    printf("y real = 0x%08X\n",valor_hex_y);
+int calcular_ciclos(float  valor_hex_x,float valor_hex_y) {
+	//printf("x real = 0x%08X\n",valor_hex_x);
+   // printf("y real = 0x%08X\n",valor_hex_y);
     uint32_t expoente_x = ((*(uint32_t*)&valor_hex_x) >> 23) & 0xFF;
     uint32_t expoente_y = ((*(uint32_t*)&valor_hex_y) >> 23) & 0xFF;
-    printf("x = 0x%08X\n",expoente_x);
-    printf("y = 0x%08X\n",expoente_y);
+    //printf("x = 0x%08X\n",expoente_x);
+    //printf("y = 0x%08X\n",expoente_y);
     if(expoente_x != 0) expoente_x = expoente_x - 127;
     if(expoente_y != 0) expoente_y = expoente_y - 127;
     int resultado = abs(expoente_x - expoente_y) + 1;
@@ -190,7 +190,7 @@ int calcular_ciclos(uint32_t  valor_hex_x, uint32_t  valor_hex_y) {
     return resultado;
 }
 
-uint32_t convertToIEEE754(uint32_t  value) {
+uint32_t convertToIEEE754(float  value) {
     uint32_t *ptr = (uint32_t*)&value;
     uint32_t binaryValue = *ptr;
     return binaryValue;
@@ -381,7 +381,7 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,FILE* output
 				if(instruction->z == 0){
 					cyv = (int64_t)(arq->Reg[instruction->y]) >> (ShiftBit(instruction->l,0,5) + 1);
 				} else {
-					printf("p1\n");
+					//printf("p1\n");
 					cyv = ((int64_t)(arq->Reg[instruction->z] << 32) + (int32_t)(arq->Reg[instruction->y])) >> (ShiftBit(instruction->l,0,5) + 1);
 				}
 
@@ -650,37 +650,37 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
 				arq->fpu->OPST = arq->Reg[instruction->z];
 				if(ShiftBit(arq->fpu->OPST,0,5) == 0b00001){
 					arq->fpu->z = arq->fpu->x + arq->fpu->y;
-					arq->fpu->z = convertToIEEE754(arq->fpu->z);
+					arq->fpu->z = convertToIEEE754(arq->fpu->x + arq->fpu->y);
 					arq->fpu->cicle = calcular_ciclos(arq->fpu->x,arq->fpu->y);
 				}
 				if(ShiftBit(arq->fpu->OPST,0,5) == 0b00010){
 					arq->fpu->z = arq->fpu->x - arq->fpu->y;
-					arq->fpu->z = convertToIEEE754(arq->fpu->z);
+					arq->fpu->z = convertToIEEE754(arq->fpu->x - arq->fpu->y);
 					arq->fpu->cicle = calcular_ciclos(arq->fpu->x,arq->fpu->y);
 				}
 				if(ShiftBit(arq->fpu->OPST,0,5) == 0b00011){
 					arq->fpu->z = arq->fpu->x * arq->fpu->y;
-					arq->fpu->z = convertToIEEE754(arq->fpu->z);
+					arq->fpu->z = convertToIEEE754(arq->fpu->x * arq->fpu->y);
 					arq->fpu->cicle = calcular_ciclos(arq->fpu->x,arq->fpu->y);
 				}
 				if(ShiftBit(arq->fpu->OPST,0,5) == 0b00100){
 					if(arq->fpu->y != 0){
 						arq->fpu->z = arq->fpu->x / arq->fpu->y;
-						arq->fpu->z = convertToIEEE754(arq->fpu->z);
+						arq->fpu->z = convertToIEEE754(arq->fpu->x / arq->fpu->y);
 						arq->fpu->cicle = calcular_ciclos(arq->fpu->x,arq->fpu->y);
 
 					} else {
-						//arq->fpu->z = convertToIEEE754(arq->fpu->z);
+						arq->fpu->z = convertToIEEE754(arq->fpu->z);
 						arq->fpu->cicle = calcular_ciclos(arq->fpu->x,arq->fpu->y);
             arq->fpu->OPST = arq->fpu->OPST | 0b100000;
 					}
 				}
 				if(ShiftBit(arq->fpu->OPST,0,5) == 0b00101){
-					arq->fpu->x = convertToIEEE754(arq->fpu->z);
+					arq->fpu->x = arq->fpu->z;
 					arq->fpu->cicle = 1;
 				}
 				if(ShiftBit(arq->fpu->OPST,0,5) == 0b00110){
-					arq->fpu->y = convertToIEEE754(arq->fpu->z);
+					arq->fpu->y = arq->fpu->z;
 					arq->fpu->cicle = 1;
 				}
 				if(ShiftBit(arq->fpu->OPST,0,5) == 0b00111){
@@ -985,7 +985,11 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,FILE* output
 
 			break;
 		case 0b101110:
-			IplusSinal = (ShiftBit(instruction->i,25,1) << 6) == 1? (0x3F << 25) +instruction->i : instruction->i;
+			IplusSinal = arq->Reg[28] & 0x03FFFFFF;
+      if(IplusSinal >> 25 == 1){
+        IplusSinal = IplusSinal | 0xFC000000; 
+      }
+      //printf("Iplus = %d\n",IplusSinal);
 			sprintf(instrucao,"beq %d",IplusSinal);
 			if(ShiftBit(arq->Reg[31],6,1) == 1){
 				fprintf(output,"0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (IplusSinal << 2));
@@ -1157,7 +1161,7 @@ void processFile(FILE* input,FILE* output){
 			typeU* newIU = malloc(sizeof(typeU));
 			typeF* newIF = malloc(sizeof(typeF));
 			typeS* newIS = malloc(sizeof(typeS));
-      printf("arq->Reg[29] = 0x%08X\n",newArq->Reg[29]);
+      //printf("arq->Reg[29] = 0x%08X\n",newArq->Reg[29]);
 			if(optype == 'U'){
 				newIU->opcode = opcode;
 				newIU->x = (newArq->Reg[28] & (0b11111 << 16)) >> 16;
