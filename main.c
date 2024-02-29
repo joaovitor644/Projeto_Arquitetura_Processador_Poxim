@@ -82,7 +82,7 @@ ArqResources* inicialization(){
 	newArq->term = newT;
 	newArq->fpu = newF;
 	newArq->wdog = newW;
-	newArq->Mem = (uint32_t*)calloc(32,1024);
+	newArq->Mem = (uint32_t*)calloc(32,10024);
 	return newArq;
 }
 
@@ -191,7 +191,7 @@ int calcular_ciclos(float valor_hex_x, float valor_hex_y) {
     if(expoente_y != 0) expoente_y = expoente_y - 127;
     // Calcular a operação desejada
     int resultado = abs(expoente_x - expoente_y) + 1;
-	printf("resultado = %d\n",resultado);
+	//printf("resultado = %d\n",resultado);
     //printf("ciclos = %d\n",resultado);
     return resultado;
 }
@@ -229,6 +229,7 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,FILE* output
 			arq->Reg[29] = arq->Reg[29] + 4;
 			break;
 		case 0b000010:
+      //printf("passou\n");
 			if(instruction->x == 0) arq->Reg[0] = 0;
 			if(instruction->y == 0) arq->Reg[0] = 0;
 			cyv = ((int64_t)(arq->Reg[instruction->x]) + (int64_t)(arq->Reg[instruction->y]));
@@ -923,6 +924,7 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,FILE* output
 		case 0b110111:
 			IplusSinal = (ShiftBit(instruction->i,25,1)) == 1? (0x3F << 26)+ instruction->i : instruction->i;
 			sprintf(instrucao, "bun %d", IplusSinal);
+      //printf("%s aaaaaaaaaaaaaaaaaaaaaa\n",instrucao);
 			if(IplusSinal == 0){
 				fprintf(output,"0x%08X:\t%-25s\tPC=0x%08X\n", arq->Reg[29],instrucao,arq->Reg[29] + 4);
 				arq->Reg[29] = arq->Reg[29] + 4;
@@ -1198,9 +1200,10 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,FILE* output
 void processFile(FILE* input,FILE* output){
 	ArqResources* newArq = inicialization();
 	int flag = 0;
-	uint8_t i = 0;
+	uint32_t i = 0;
 	while(!feof(input)){
 		fscanf(input,"0x%8X\n",&newArq->Mem[i]);
+    //printf("0x%08X\n",newArq->Mem[i]);
 		i++;
 	}
 	i = 0;
@@ -1221,13 +1224,17 @@ void processFile(FILE* input,FILE* output){
 				//printf("ciclos 2 = %d\n",newArq->fpu->cicle);
 				newArq->fpu->cicle--;
 			}
+      //printf("0x%08X\n",newArq->Mem[0]); 
 			newArq->Reg[28] = newArq->Mem[newArq->Reg[29] >> 2];
+      //printf("0x%08X\n",newArq->Reg[28]);
 			uint8_t opcode = (newArq->Reg[28] & (0b111111 << 26)) >> 26;
+     // printf("opcode = 0x%08X\n",opcode);
 			char optype = opcodeType(opcode);
 			typeU* newIU = malloc(sizeof(typeU));
 			typeF* newIF = malloc(sizeof(typeF));
 			typeS* newIS = malloc(sizeof(typeS));
-      //printf("arq->Reg[29] = 0x%08X\n",newArq->Reg[29]);
+   //   printf("arq->Reg[29] = 0x%08X\n",newArq->Reg[29]);
+
 			if(optype == 'U'){
 				newIU->opcode = opcode;
 				newIU->x = (newArq->Reg[28] & (0b11111 << 16)) >> 16;
