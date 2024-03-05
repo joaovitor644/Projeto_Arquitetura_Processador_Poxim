@@ -53,7 +53,7 @@ typedef struct typeS{
 
 
 void changerValue(uint32_t* value,uint8_t pos,uint8_t v){
-	*value = *value | (v << pos);
+	*value = (*value & ~((1 << pos))) | (v << pos);
 }
 
 
