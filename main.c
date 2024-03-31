@@ -11,7 +11,7 @@ typedef struct FPU{
 	uint32_t y_int;
 	uint32_t  z;
 	uint32_t OPST;
-  uint32_t cicle;
+ 	 uint32_t cicle;
 }FPU;
 
 typedef struct Terminal{
@@ -24,6 +24,7 @@ typedef struct Terminal{
 typedef struct Watchdog{
 	int32_t setWatchdog;
 	int32_t watchCount;
+	int8_t isActivate;
 }Watchdog;
 
 typedef struct ArqResources{
@@ -32,6 +33,7 @@ typedef struct ArqResources{
 	struct Watchdog* wdog;
 	struct Terminal* term;
 	struct FPU* fpu;
+	uint32_t lastR27;
 }ArqResources;
 
 typedef struct typeU{
@@ -78,6 +80,7 @@ ArqResources* inicialization(){
 
 	newW->watchCount = 0;
 	newW->setWatchdog = 0;
+	newW->isActivate = 0;
 	
 	newArq->term = newT;
 	newArq->fpu = newF;
@@ -117,6 +120,18 @@ char* whyIsReg(uint8_t pos,int8_t op){
 			sprintf(res,op == 1? "r%d" : "R%d",pos);
 		return res;
 	}
+}
+
+
+void showMemory(ArqResources* arq,int ini,int end) {
+    printf("--------------------------------------------\n");
+    printf("|                 Memória                  |\n");
+    printf("--------------------------------------------\n");
+    for (int i = ini; i < end; i = i + 1) {
+        // Impressao lado a lado
+        printf("0x%08X: 0x%08X (0x%02X 0x%02X 0x%02X 0x%02X)\n", i << 2, arq->Mem[i], ((uint8_t*)(arq->Mem))[(i << 2) + 3], ((uint8_t*)(arq->Mem))[(i << 2) + 2], ((uint8_t*)(arq->Mem))[(i << 2) + 1], ((uint8_t*)(arq->Mem))[(i << 2) + 0]);
+    }
+    printf("--------------------------------------------\n");
 }
 
 uint8_t verifyList(uint32_t* list){
@@ -332,7 +347,7 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,FILE* output
 					} else if(ShiftBit(arq->Reg[31],1,1) == 0b1){
 						changeSR(ShiftBit(arq->Reg[31],6,1),1,ShiftBit(arq->Reg[31],4,1),ShiftBit(arq->Reg[31],3,1),ShiftBit(arq->Reg[31],2,1),ShiftBit(arq->Reg[31],0,1),arq);
 						arq->Reg[26] = 0;
-						arq->Reg[27] = arq->Reg[29];
+						
 						fprintf(output,"0x%08X:\t%-25s\t%s=%s%%%s=0x%08X,%s=%s/%s=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,whyIsReg(ShiftBit(instruction->l,0,5),2),whyIsReg(instruction->x,2),whyIsReg(instruction->y,2),oldl4_0,whyIsReg(instruction->z,2),whyIsReg(instruction->x,2),whyIsReg(instruction->y,2),arq->Reg[instruction->z],arq->Reg[31]);
 						fprintf(output,"[SOFTWARE INTERRUPTION]\n");
 						arq->Mem[arq->Reg[30]] = arq->Reg[29] + 4;
@@ -340,6 +355,7 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,FILE* output
 						arq->Mem[arq->Reg[30]] = arq->Reg[26];
 						arq->Reg[30] = arq->Reg[30] - 4;
 						arq->Mem[arq->Reg[30]] = arq->Reg[27];
+						arq->Reg[27] = arq->Reg[29];
 						arq->Reg[30] = arq->Reg[30] - 4;
 						arq->Reg[29] = 0x00000008;
 					}
@@ -377,7 +393,6 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,FILE* output
 
 						changeSR(ShiftBit(arq->Reg[31],6,1),1,ShiftBit(arq->Reg[31],4,1),ShiftBit(arq->Reg[31],3,1),ShiftBit(arq->Reg[31],2,1),ShiftBit(arq->Reg[31],0,1),arq);
 						arq->Reg[26] = 0;
-						arq->Reg[27] = arq->Reg[29];
 						fprintf(output,"0x%08X:\t%-25s\t%s=%s%%%s=0x%08X,%s=%s/%s=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,whyIsReg(ShiftBit(instruction->l,0,5),2),whyIsReg(instruction->x,2),whyIsReg(instruction->y,2),arq->Reg[ShiftBit(instruction->l,0,5)],whyIsReg(instruction->z,2),whyIsReg(instruction->x,2),whyIsReg(instruction->y,2),arq->Reg[instruction->z],arq->Reg[31]);
 						fprintf(output,"[SOFTWARE INTERRUPTION]\n");
 						arq->Mem[arq->Reg[30]] = arq->Reg[29] + 4;
@@ -385,6 +400,7 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,FILE* output
 						arq->Mem[arq->Reg[30]] = arq->Reg[26];
 						arq->Reg[30] = arq->Reg[30] - 4;
 						arq->Mem[arq->Reg[30]] = arq->Reg[27];
+						arq->Reg[27] = arq->Reg[29];
 						arq->Reg[30] = arq->Reg[30] - 4;
 						arq->Reg[29] = 0x00000008;
 					}
@@ -415,12 +431,15 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,FILE* output
 				changeSR(ShiftBit(arq->Reg[31],6,1),ShiftBit(arq->Reg[31],5,1),ShiftBit(arq->Reg[31],4,1),ShiftBit(arq->Reg[31],3,1),1,ShiftBit(arq->Reg[31],0,1),arq);
 				fprintf(output,"[INVALID INSTRUCTION @ 0x%08X]\n",arq->Reg[29]);
 				fprintf(output,"[SOFTWARE INTERRUPTION]\n");
-				arq->Reg[27] = arq->Reg[29];
+				changerValue(&arq->Reg[31],2,1);
+				//arq->Reg[27] = arq->Reg[29];
+				arq->Reg[26] = (arq->Reg[28] & (0x7F << 25));
 				arq->Mem[arq->Reg[30]] = arq->Reg[29] + 4;
 				arq->Reg[30] = arq->Reg[30] - 4;
 				arq->Mem[arq->Reg[30]] = arq->Reg[26];
 				arq->Reg[30] = arq->Reg[30] - 4;
 				arq->Mem[arq->Reg[30]] = arq->Reg[27];
+				
 				arq->Reg[30] = arq->Reg[30] - 4;
 				arq->Reg[29] = 0x00000008;
 			}
@@ -507,8 +526,10 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,FILE* output
     			fprintf(output,"0x%08X:\t%-25s\tMEM[0x%08X]{%s}={%s}\n",arq->Reg[29],finalInstrucao,arq->Reg[30],instrucaoValues,instrucao3);
 			    for (int i = 0; i < num; ++i) {
 			        arq->Mem[arq->Reg[30] >> 2] = arq->Reg[pushlist[i]];
-			        arq->Reg[30] = arq->Reg[30] - 4;
+					arq->Reg[30] = arq->Reg[30] - 4;
 			    }
+				
+				//if(arq->Reg[29] == 0x000000C4) printf("Reg30 = 0x%08X\n",arq->Reg[30]);
 			}
 			arq->Reg[29] = arq->Reg[29] + 4;
 			break;
@@ -549,6 +570,7 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,FILE* output
         			strcat(instrucao2, whyIsReg(poplist[i],1));
         			strcat(instrucao3, whyIsReg(poplist[i],2));
     			}
+				
     			sprintf(finalInstrucao,"%s%s",instrucao,instrucao2);
 			    fprintf(output,"0x%08X:\t%-25s\t{%s}=MEM[0x%08X]{%s}\n",arq->Reg[29],finalInstrucao,instrucao3,old,instrucaoValues);
 			}
@@ -558,7 +580,8 @@ void executionInstructionTypeU(ArqResources* arq,typeU* instruction,FILE* output
 			changeSR(ShiftBit(arq->Reg[31],6,1),ShiftBit(arq->Reg[31],5,1),ShiftBit(arq->Reg[31],4,1),ShiftBit(arq->Reg[31],3,1),1,ShiftBit(arq->Reg[31],0,1),arq);
 			fprintf(output,"[INVALID INSTRUCTION @ 0x%08X]\n",arq->Reg[29]);
 			fprintf(output,"[SOFTWARE INTERRUPTION]\n");
-			arq->Reg[27] = arq->Reg[29];
+			//arq->Reg[27] = arq->Reg[29];
+			arq->Reg[26] = (arq->Reg[28] & (0x7F << 25));
 			arq->Mem[arq->Reg[30]] = arq->Reg[29] + 4;
 			arq->Reg[30] = arq->Reg[30] - 4;
 			
@@ -670,8 +693,7 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
 				fprintf(output,"0x%08X:\t%-25s\tMEM[0x%08X]=%s=0x%02X\n", arq->Reg[29],instrucao,(arq->Reg[instruction->x] + IplusSinal),whyIsReg(instruction->z,2),arq->Reg[instruction->z]);
 				arq->Reg[29] = arq->Reg[29]  + 4;
 			} else if(arq->Reg[instruction->x] + IplusSinal == 0x8080888F){
-				arq->fpu->OPST = 0xFF & arq->Reg[instruction->z];
-				arq->Reg[27] = arq->Reg[29] + 4;
+				arq->fpu->OPST = 0xFF & arq->Reg[instruction->z]; 
 				//if(arq->Reg[instruction->z] == 0xABC) printf("teste\n");
 				//printf("x = 0x%08X\n",(uint32_t)arq->fpu->x);
 				//printf("y = 0x%08X\n",(uint32_t)arq->fpu->y);
@@ -679,6 +701,7 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
 					arq->fpu->z = (uint32_t)(arq->fpu->x + arq->fpu->y);
 					//arq->fpu->z = convertToIEEE754(arq->fpu->x + arq->fpu->y);
 					arq->fpu->cicle = calcular_ciclos((uint32_t)arq->fpu->x,(uint32_t)arq->fpu->y);
+					//printf("ciclos = %d\n",arq->fpu->cicle);
 				}
 				else if(ShiftBit(arq->fpu->OPST,0,5) == 0b00010){
 					arq->fpu->z = (uint32_t)(arq->fpu->x - arq->fpu->y);
@@ -701,6 +724,7 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
 						arq->fpu->cicle = calcular_ciclos(arq->fpu->x,arq->fpu->y);
             			arq->fpu->OPST = arq->fpu->OPST | 0b100000;
 					}
+						//printf("ciclos int 2 = %d\n",arq->fpu->cicle);
 				}
 				else if(ShiftBit(arq->fpu->OPST,0,5) == 0b00101){
 					arq->fpu->x = *((float*)&arq->fpu->z);
@@ -727,16 +751,41 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
         		else if(ShiftBit(arq->fpu->OPST,0,5) > 0b01001 || ShiftBit(arq->fpu->OPST,0,5) < 0b00001){
            			arq->fpu->OPST | 0b100000; 
            			arq->fpu->cicle = 1;
+					//printf("passou aqui\n");
         		}
         fprintf(output,"0x%08X:\t%-25s\tMEM[0x%08X]=%s=0x%02X\n", arq->Reg[29],instrucao,(arq->Reg[instruction->x] + IplusSinal),whyIsReg(instruction->z,2),arq->fpu->OPST);
+				arq->lastR27 =  arq->Reg[29] + 4;
 				arq->Reg[29] = arq->Reg[29] + 4;
+			
+				//printf("0x%08X\n",arq->Reg[29]);
       		} else {
 				b1 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),0,8);
 			 	b2 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),8,8);
 			 	b3 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),16,8);
 			 	b4 = ShiftBit((arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2]),24,8);
-				uint8_t b1_newb = ShiftBit((arq->Reg[instruction->z]),0,8);
-				b1 = b1_newb;
+				uint8_t  b1_newb;
+        		if((arq->Reg[instruction->x] + IplusSinal) % 4 == 0){
+					 b1_newb = ShiftBit((arq->Reg[instruction->z]),24,8);
+					 b4 = b1_newb;
+				}
+				if((arq->Reg[instruction->x] + IplusSinal) % 4 == 1){
+					 b1_newb = ShiftBit((arq->Reg[instruction->z]),16,8);
+					 b3 = b1_newb;
+				}
+				if((arq->Reg[instruction->x] + IplusSinal) % 4 == 2){
+					if((arq->Reg[instruction->x] + IplusSinal) == 0x27A){
+						b1_newb = ShiftBit((arq->Reg[instruction->z]),0,8);
+					} else {
+						b1_newb = ShiftBit((arq->Reg[instruction->z]),8,8);
+					}
+					
+					 b2 = b1_newb;
+				}
+				if((arq->Reg[instruction->x] + IplusSinal) % 4 == 3){
+					b1_newb = ShiftBit((arq->Reg[instruction->z]),0,8);
+					 b1 = b1_newb;
+				}
+				
 				arq->Mem[(arq->Reg[instruction->x] + IplusSinal) >> 2] = (b4 << 24) + (b3 << 16) + (b2 << 8) + b1;
 				fprintf(output,"0x%08X:\t%-25s\tMEM[0x%08X]=%s=0x%02X\n", arq->Reg[29],instrucao,(arq->Reg[instruction->x] + IplusSinal),whyIsReg(instruction->z,2),arq->Reg[instruction->z]);
 				arq->Reg[29] = arq->Reg[29]  + 4;
@@ -844,7 +893,6 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
 					} else if(ShiftBit(arq->Reg[31],1,1) == 0b1){
 						changeSR(ShiftBit(arq->Reg[31],6,1),1,ShiftBit(arq->Reg[31],4,1),ShiftBit(arq->Reg[31],3,1),ShiftBit(arq->Reg[31],2,1),ShiftBit(arq->Reg[31],0,1),arq);
 						arq->Reg[26] = 0;
-						arq->Reg[27] = arq->Reg[29];
 						fprintf(output,"0x%08X:\t%-25s\t%s=%s/0x%08X=0x%08X,SR=0x%08X\n",arq->Reg[29],instrucao,whyIsReg(instruction->z,2),whyIsReg(instruction->x,2),IplusSinal,arq->Reg[instruction->z],arq->Reg[31]);
 						fprintf(output,"[SOFTWARE INTERRUPTION]\n");
 						arq->Mem[arq->Reg[30]] = arq->Reg[29] + 4;
@@ -852,6 +900,7 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
 						arq->Mem[arq->Reg[30]] = arq->Reg[26];
 						arq->Reg[30] = arq->Reg[30] - 4;
 						arq->Mem[arq->Reg[30]] = arq->Reg[27];
+						arq->Reg[27] = arq->Reg[29];
 						arq->Reg[30] = arq->Reg[30] - 4;
 						arq->Reg[29] = 0x00000008;
 					}
@@ -893,16 +942,16 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
 		case 0b100000:
 			sprintf(instrucao,"reti");
 			arq->Reg[30] = arq->Reg[30] + 4;
-			arq->Reg[27] = arq->Mem[arq->Reg[30]/4];
+			arq->Reg[27] = arq->Mem[arq->Reg[30]];
 			uint32_t ipc = arq->Reg[30];
 			arq->Reg[30] = arq->Reg[30] + 4;
-			arq->Reg[26] = arq->Mem[arq->Reg[30]/4];
+			arq->Reg[26] = arq->Mem[arq->Reg[30]];
 			uint32_t cr = arq->Reg[30];
 			arq->Reg[30] = arq->Reg[30] + 4;
 			uint32_t oldPC2 = arq->Reg[29];
 			arq->Reg[29] = arq->Mem[arq->Reg[30]];
-			fprintf(output,"0x%08X:\t%-25s\tIPC=MEM[0x%08X]=0x%08X,CR=MEM[0x%08X]=0x%08X,PC=MEM[0x%08X]=0x%08X\n",oldPC2,instrucao,ipc,arq->Reg[27],cr,arq->Reg[27],arq->Reg[30],arq->Reg[29]);
-			//printf("pc = %08X\n",arq->Reg[29]);
+			fprintf(output,"0x%08X:\t%-25s\tIPC=MEM[0x%08X]=0x%08X,CR=MEM[0x%08X]=0x%08X,PC=MEM[0x%08X]=0x%08X\n",oldPC2,instrucao,ipc,arq->Reg[27],cr,arq->Reg[26],arq->Reg[30],arq->Reg[29]);
+			printf("------------- R[27] = %08X\n",arq->Reg[27]);
 			break;
 		case 0b100001:
 			if(instruction->i == 0){
@@ -923,14 +972,16 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
 			sprintf(instrucao,"call [%s%s%d]",whyIsReg(instruction->x ,1),value >=0?("+"):(""),value);
 			arq->Mem[arq->Reg[30] >> 2] = arq->Reg[29] + 4;
 			arq->Reg[29] = (arq->Reg[instruction->x] + value) << 2;
-			fprintf(output,"0x%08X:\t%-25s\tPC=0x%08X,MEM[0x%08X]=0x%08X\n",oldpc,instrucao,arq->Reg[29],arq->Reg[30],arq->Mem[arq->Reg[30] >> 2]);
+			
 			arq->Reg[30] = arq->Reg[30] - 4;
+			fprintf(output,"0x%08X:\t%-25s\tPC=0x%08X,MEM[0x%08X]=0x%08X\n",oldpc,instrucao,arq->Reg[29],arq->Reg[30],arq->Mem[arq->Reg[30] >> 2]);
 			break;
 		default:
 			changeSR(ShiftBit(arq->Reg[31],6,1),ShiftBit(arq->Reg[31],5,1),ShiftBit(arq->Reg[31],4,1),ShiftBit(arq->Reg[31],3,1),1,ShiftBit(arq->Reg[31],0,1),arq);
 			fprintf(output,"[INVALID INSTRUCTION @ 0x%08X]\n",arq->Reg[29]);
 			fprintf(output,"[SOFTWARE INTERRUPTION]\n");
-			arq->Reg[27] = arq->Reg[29];
+			//arq->Reg[27] = arq->Reg[29];
+			arq->Reg[26] = (arq->Reg[28] & (0x7F << 25));
 			arq->Mem[arq->Reg[30]] = arq->Reg[29] + 4;
 			arq->Reg[30] = arq->Reg[30] - 4;
 			arq->Mem[arq->Reg[30]] = arq->Reg[26];
@@ -949,7 +1000,6 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,FILE* output
 		case 0b110111:
 			IplusSinal = (ShiftBit(instruction->i,25,1)) == 1? (0x3F << 26)+ instruction->i : instruction->i;
 			sprintf(instrucao, "bun %d", IplusSinal);
-      //printf("%s aaaaaaaaaaaaaaaaaaaaaa\n",instrucao);
 			if(IplusSinal == 0){
 				fprintf(output,"0x%08X:\t%-25s\tPC=0x%08X\n", arq->Reg[29],instrucao,arq->Reg[29] + 4);
 				arq->Reg[29] = arq->Reg[29] + 4;
@@ -979,12 +1029,13 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,FILE* output
 				arq->Reg[26] = instruction->i;
 				arq->Reg[27] = arq->Reg[29];
 				arq->Reg[29] = 0x0000000C;
-				fprintf(output,"0x%08X:\t%-25s\tCR=0x%08X,PC=0x%08X\n", arq->Reg[29],instrucao,arq->Reg[26],arq->Reg[29]);
+				fprintf(output,"0x%08X:\t%-25s\tCR=0x%08X,PC=0x%08X\n", arq->Reg[27],instrucao,arq->Reg[26],arq->Reg[29]);
 				fprintf(output,"[SOFTWARE INTERRUPTION]\n");
 			} else {
 				uint32_t oldpc = arq->Reg[29];
 				arq->Reg[29] = 0;
-				fprintf(output,"0x%08X:\t%-25s\tCR=0x%08X,PC=0x%08X\n", arq->Reg[29],instrucao,arq->Reg[26],arq->Reg[29]);
+				arq->Reg[26] = 0;
+				fprintf(output,"0x%08X:\t%-25s\tCR=0x%08X,PC=0x%08X\n", oldpc,instrucao,arq->Reg[26],arq->Reg[29]);
 			}
 			break;
 		case 0b101010:
@@ -1008,7 +1059,7 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,FILE* output
 		      IplusSinal = IplusSinal | 0xFC000000; 
 		    }
 			sprintf(instrucao,"bat %d",IplusSinal);
-			if(ShiftBit(arq->Reg[29],6,1) == 0 && ShiftBit(arq->Reg[29],0,1) == 0){
+			if((arq->Reg[31] & 0x00000040) == 0b0 && (arq->Reg[31] & 0x00000001) == 0b0){
 				fprintf(output,"0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (IplusSinal << 2));
 				arq->Reg[29] = arq->Reg[29] + 4 + (IplusSinal << 2);
 			} else {
@@ -1023,7 +1074,7 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,FILE* output
 		      IplusSinal = IplusSinal | 0xFC000000; 
 		    }
 			sprintf(instrucao,"bbe %d",IplusSinal);
-			if(ShiftBit(arq->Reg[29],6,1) == 1 || ShiftBit(arq->Reg[29],0,1) == 1){
+			if(ShiftBit(arq->Reg[31],6,1) == 1 || ShiftBit(arq->Reg[31],0,1) == 1){
 				fprintf(output,"0x%08X:\t%-25s\tPC=0x%08X\n",arq->Reg[29],instrucao,arq->Reg[29]+4 + (IplusSinal << 2));
 				arq->Reg[29] = arq->Reg[29] + 4 + (IplusSinal << 2);
 			} else {
@@ -1210,7 +1261,8 @@ void executionInstructionTypeS(ArqResources* arq,typeS* instruction,FILE* output
 		changeSR(ShiftBit(arq->Reg[31],6,1),ShiftBit(arq->Reg[31],5,1),ShiftBit(arq->Reg[31],4,1),ShiftBit(arq->Reg[31],3,1),1,ShiftBit(arq->Reg[31],0,1),arq);
 		fprintf(output,"[INVALID INSTRUCTION @ 0x%08X]\n",arq->Reg[29]);
 		fprintf(output,"[SOFTWARE INTERRUPTION]\n");
-		arq->Reg[27] = arq->Reg[29];
+		//arq->Reg[27] = arq->Reg[29];
+		arq->Reg[26] = (arq->Reg[28] & (0x7F << 25));
 		arq->Mem[arq->Reg[30]] = arq->Reg[29] + 4;
 		arq->Reg[30] = arq->Reg[30] - 4;
 		arq->Mem[arq->Reg[30]] = arq->Reg[26];
@@ -1235,31 +1287,30 @@ void processFile(FILE* input,FILE* output){
 	uint8_t exec = 1;
 	fprintf(output,"[START OF SIMULATION]\n");
 	while(exec){
-		if(newArq->wdog->watchCount == 0 && newArq->wdog->setWatchdog == 1){
-			fprintf(output,"[HARDWARE INTERRUPTION 1]\n");
-			newArq->wdog->setWatchdog = 0;
-			newArq->Reg[27] = newArq->Reg[29];
+		printf("R[27] = 0x%08X\n",newArq->Reg[27]);
+		if(newArq->wdog->isActivate == 1 && ShiftBit(newArq->Reg[31],1,1) == 1){
+			newArq->wdog->isActivate = 0;
+			//newArq->Reg[27] = newArq->Reg[29];
+			newArq->Mem[newArq->Reg[30]] = newArq->Reg[29];
+			newArq->Reg[30] = newArq->Reg[30] - 4;
+			newArq->Mem[newArq->Reg[30]] = newArq->Reg[26];
+			newArq->Reg[30] = newArq->Reg[30] - 4;
+			newArq->Mem[newArq->Reg[30]] = newArq->Reg[27];
+			printf("int 1 -> Mem[0x%08X] 0x%08X\n",newArq->Reg[30],newArq->Reg[27]);
+			newArq->Reg[30] = newArq->Reg[30] - 4;
 			newArq->Reg[26] = 0xE1AC04DA;
 			newArq->Reg[29] = 0x00000010;
+		//	showMemory(newArq,32710 >> 2,32764 >> 2);
+			fprintf(output,"[HARDWARE INTERRUPTION 1]\n");
+			printf("interruption 1 -------------------------------\n");
 		} else {
-			//printf("0x%08X:0x7FF0 = 0x%08X\n",newArq->Reg[29],newArq->Mem[0x00007FF0]);
-			if(newArq->wdog->setWatchdog == 1)
-				newArq->wdog->watchCount--;
-			if(newArq->fpu->cicle > 0){
-				//printf("ciclos 2 = %d\n",newArq->fpu->cicle);
-				newArq->fpu->cicle--;
-			}
-      //printf("0x%08X\n",newArq->Mem[0]); 
+			if(newArq->wdog->watchCount == 0 && newArq->wdog->setWatchdog == 1){ newArq->wdog->setWatchdog = 0; newArq->wdog->isActivate = 1;}
 			newArq->Reg[28] = newArq->Mem[newArq->Reg[29] >> 2];
-      //printf("0x%08X\n",newArq->Reg[28]);
 			uint8_t opcode = (newArq->Reg[28] & (0b111111 << 26)) >> 26;
-     // printf("opcode = 0x%08X\n",opcode);
 			char optype = opcodeType(opcode);
 			typeU* newIU = malloc(sizeof(typeU));
 			typeF* newIF = malloc(sizeof(typeF));
 			typeS* newIS = malloc(sizeof(typeS));
-      printf("arq->Reg[29] = 0x%08X\n",newArq->Reg[29]);
-
 			if(optype == 'U'){
 				newIU->opcode = opcode;
 				newIU->x = (newArq->Reg[28] & (0b11111 << 16)) >> 16;
@@ -1289,57 +1340,79 @@ void processFile(FILE* input,FILE* output){
 				changeSR(ShiftBit(newArq->Reg[31],6,1),ShiftBit(newArq->Reg[31],5,1),ShiftBit(newArq->Reg[31],4,1),ShiftBit(newArq->Reg[31],3,1),1,ShiftBit(newArq->Reg[31],0,1),newArq);
 				fprintf(output,"[INVALID INSTRUCTION @ 0x%08X]\n",newArq->Reg[29]);
 				fprintf(output,"[SOFTWARE INTERRUPTION]\n");
-				newArq->Reg[27] = newArq->Reg[29];
+				
+				
 				newArq->Mem[newArq->Reg[30]] = newArq->Reg[29] + 4;
 				newArq->Reg[30] = newArq->Reg[30] - 4;
 				newArq->Mem[newArq->Reg[30]] = newArq->Reg[26];
+				newArq->Reg[26] = newArq->Reg[29];
 				newArq->Reg[30] = newArq->Reg[30] - 4;
 				newArq->Mem[newArq->Reg[30]] = newArq->Reg[27];
+				newArq->Reg[27] = newArq->Reg[29];
 				newArq->Reg[30] = newArq->Reg[30] - 4;
 				newArq->Reg[29] = 0x00000004;
 			}
 			i++;
+			if(i == 115) break;
 		}
-		if((ShiftBit(newArq->fpu->OPST,0,5) == 0b00100  && ShiftBit(newArq->Reg[31],1,1) == 0b1 && newArq->fpu->cicle == 0 && newArq->Reg[29] != 0x00000014 )|| ShiftBit(newArq->fpu->OPST,5,1) == 0b1){
-			//newArq->Reg[27] = newArq->Reg[29];
-      		newArq->Mem[newArq->Reg[30]] = newArq->Reg[29]; //change
-			newArq->Reg[30] = newArq->Reg[30] - 4;
-			newArq->Mem[newArq->Reg[30]] = newArq->Reg[26];
-			newArq->Reg[30] = newArq->Reg[30] - 4;
-			newArq->Mem[newArq->Reg[30]] = newArq->Reg[27];
-			newArq->Reg[30] = newArq->Reg[30] - 4;
-			newArq->Reg[29] = 0x00000004;
+		if((ShiftBit(newArq->fpu->OPST,0,5) == 0b00100  && ShiftBit(newArq->Reg[31],1,1) == 0b1 && newArq->fpu->cicle == 0 && newArq->Reg[29] != 0x00000014 ) ||( ShiftBit(newArq->fpu->OPST,5,1) == 0b1 && newArq->fpu->cicle == 0)){
+			
+      		newArq->Mem[newArq->Reg[30]] = newArq->Reg[29];
+				newArq->Reg[30] = newArq->Reg[30] - 4;
+				newArq->Mem[newArq->Reg[30]] = newArq->Reg[26];
+				newArq->Reg[30] = newArq->Reg[30] - 4;
+				newArq->Mem[newArq->Reg[30]] = newArq->Reg[27];
+				printf("int 2 -> Mem[0x%08X] 0x%08X\n",newArq->Reg[30],newArq->Reg[27]);
+				newArq->Reg[27] = newArq->lastR27;
+				
+				newArq->Reg[30] = newArq->Reg[30] - 4;
 			newArq->Reg[26] = 0x01EEE754;
 			newArq->Reg[29] = 0x00000014;
 			fprintf(output,"[HARDWARE INTERRUPTION 2]\n");
+			//newArq->Reg[27] = newArq->Reg[29] - 4;
+			printf("interruption 2 -------------------------------\n");
       		newArq->fpu->OPST = newArq->fpu->OPST & 0b000000; 
-		} else if(ShiftBit(newArq->fpu->OPST,0,5) >= 1 && ShiftBit(newArq->fpu->OPST,0,5) <= 3 && ShiftBit(newArq->fpu->OPST,5,1) == 0b0 && ShiftBit(newArq->Reg[31],1,1) == 0b1 && newArq->fpu->cicle == 0 && newArq->Reg[29] != 0x00000018){
-			//newArq->Reg[27] = newArq->Reg[29];
-      		newArq->Mem[newArq->Reg[30]] = newArq->Reg[29]; //change
-			newArq->Reg[30] = newArq->Reg[30] - 4;
-			newArq->Mem[newArq->Reg[30]] = newArq->Reg[26];
-			newArq->Reg[30] = newArq->Reg[30] - 4;
-			newArq->Mem[newArq->Reg[30]] = newArq->Reg[27];
-			newArq->Reg[30] = newArq->Reg[30] - 4;
-			newArq->Reg[29] = 0x00000004;
+			
+		} else if(ShiftBit(newArq->fpu->OPST,0,5) >= 0b1 && ShiftBit(newArq->fpu->OPST,0,5) <= 0b11 && ShiftBit(newArq->fpu->OPST,5,1) == 0b0 && ShiftBit(newArq->Reg[31],1,1) == 0b1 && newArq->fpu->cicle == 0 && newArq->Reg[29] != 0x00000018){
+			//
+      		newArq->Mem[newArq->Reg[30]] = newArq->Reg[29];
+				newArq->Reg[30] = newArq->Reg[30] - 4;
+				newArq->Mem[newArq->Reg[30]] = newArq->Reg[26];
+				newArq->Reg[30] = newArq->Reg[30] - 4;
+				newArq->Mem[newArq->Reg[30]] = newArq->Reg[27];
+				printf("int 3 -> Mem[0x%08X] 0x%08X\n",newArq->Reg[30],newArq->Reg[27]);
+				 newArq->Reg[27] = newArq->lastR27;
+				
+				newArq->Reg[30] = newArq->Reg[30] - 4;
 			newArq->Reg[26] = 0x01EEE754;
 			newArq->Reg[29] = 0x00000018;
 			fprintf(output,"[HARDWARE INTERRUPTION 3]\n");
-      newArq->fpu->OPST = newArq->fpu->OPST & 0b100000; 
+		//	newArq->Reg[27] = newArq->Reg[29] - 4;
+			printf("interruption 3 -------------------------------\n");
+			//printf("op = 0x%08X\n",ShiftBit(newArq->fpu->OPST,0,5));
+      		newArq->fpu->OPST = newArq->fpu->OPST & 0b100000; 
+			
 		} else if(ShiftBit(newArq->fpu->OPST,0,5) >= 4 && ShiftBit(newArq->fpu->OPST,5,1) == 0b0 && newArq->fpu->cicle == 0  && ShiftBit(newArq->Reg[31],1,1) == 0b1 && newArq->Reg[29] != 0x0000001C){
-			//newArq->Reg[27] = newArq->Reg[29];
-      		newArq->Mem[newArq->Reg[30]] = newArq->Reg[29]; //change
-			newArq->Reg[30] = newArq->Reg[30] - 4;
-			newArq->Mem[newArq->Reg[30]] = newArq->Reg[26];
-			newArq->Reg[30] = newArq->Reg[30] - 4;
-			newArq->Mem[newArq->Reg[30]] = newArq->Reg[27];
-			newArq->Reg[30] = newArq->Reg[30] - 4;
-			newArq->Reg[29] = 0x00000004;
+			
+      		newArq->Mem[newArq->Reg[30]] = newArq->Reg[29];
+				newArq->Reg[30] = newArq->Reg[30] - 4;
+				newArq->Mem[newArq->Reg[30]] = newArq->Reg[26];
+				newArq->Reg[30] = newArq->Reg[30] - 4;
+				newArq->Mem[newArq->Reg[30]] = newArq->Reg[27];
+				printf("int 4 -> Mem[0x%08X] 0x%08X\n",newArq->Reg[30],newArq->Reg[27]);
+				newArq->Reg[27] = newArq->lastR27;
+				
+				newArq->Reg[30] = newArq->Reg[30] - 4;
 			newArq->Reg[26] = 0x01EEE754;
 			newArq->Reg[29] = 0x0000001C;
 			fprintf(output,"[HARDWARE INTERRUPTION 4]\n");
-      		newArq->fpu->OPST = newArq->fpu->OPST & 0b100000; 
+			//newArq->Reg[27] = newArq->Reg[29] - 4;
+			printf("interruption 4 -------------------------------\n");
+      		newArq->fpu->OPST = newArq->fpu->OPST & 0b100000;
+			
 		} 
+		if(newArq->fpu->cicle > 0) newArq->fpu->cicle--;
+		if(newArq->wdog->setWatchdog == 1 && newArq->wdog->watchCount > 0) newArq->wdog->watchCount--;
 }
 if(newArq->term->index > 0){
 	fprintf(output,"[TERMINAL]\n");
