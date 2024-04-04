@@ -9,6 +9,7 @@ typedef struct FPU{
 	uint32_t x_int;
 	float  y;
 	uint32_t y_int;
+	uint32_t y_intAnt;
 	uint32_t  z;
 	uint32_t OPST;
  	 uint32_t cicle;
@@ -58,6 +59,23 @@ void changerValue(uint32_t* value,uint8_t pos,uint8_t v){
 	*value = (*value & ~((1 << pos))) | (v << pos);
 }
 
+uint32_t decimal_para_ieee754(float num) {
+    uint32_t *ponteiro = (int32_t*)&num;
+    uint32_t bits = *ponteiro;
+    
+    // Extrair o bit de sinal
+    uint32_t sinal = (bits >> 31) & 1;
+    
+    // Extrair o expoente
+    uint32_t expoente = (bits >> 23) & 0xFF;
+    
+    // Extrair a mantissa
+    uint32_t mantissa = bits & 0x7FFFFF; // Usar máscara corrigida
+	printf("expoente = %d\n",expoente);
+    uint32_t result = bits;
+	printf("result = 0x%08X\n",bits);
+    return bits;
+}
 
 ArqResources* inicialization(){
 	ArqResources* newArq = (ArqResources*)malloc(sizeof(ArqResources));
@@ -197,24 +215,33 @@ char opcodeType(uint8_t op){
 
 int calcular_ciclos(uint32_t valor_hex_x,uint32_t valor_hex_y) {
     // Converter os valores hexadecimais para números de ponto flutuante
-	printf("x = 0x%08X\n",valor_hex_x);
-	printf("y = 0x%08X\n",valor_hex_y);
+	printf("para calcular expoente x = 0x%08X\n",valor_hex_x);
+	printf("para calcular expoente y = 0x%08X\n",valor_hex_y);
     // Extrair os expoentes
     uint32_t expoente_x = ((*(uint32_t*)&valor_hex_x) >> 23) & 0xFF;
     uint32_t expoente_y = ((*(uint32_t*)&valor_hex_y) >> 23) & 0xFF;
     if(expoente_x != 0) expoente_x = expoente_x - 127;
     if(expoente_y != 0) expoente_y = expoente_y - 127;
+
+	printf(" expoente x = 0x%08X\n",expoente_x);
+	printf(" expoente y = 0x%08X\n",expoente_y);
     // Calcular a operação desejada
     int resultado = abs(expoente_x - expoente_y) + 1;
 	//printf("resultado = %d\n",resultado);
-    //printf("ciclos = %d\n",resultado);
+    printf("ciclos = %d\n",resultado);
     return resultado;
 }
 
 uint32_t convertToIEEE754(float  value) {
-    uint32_t *ptr = (uint32_t*)&value;
+    uint32_t *ptr = (int32_t*)&value;
     uint32_t binaryValue = *ptr;
     return binaryValue;
+}
+
+float convertFromIEEE754(uint32_t binaryValue) {
+    uint32_t *ptr = &binaryValue;
+    float *float_ptr = (float*)ptr;
+    return *float_ptr;
 }
 
 void executionInstructionTypeU(ArqResources* arq,typeU* instruction,FILE* output){
@@ -616,7 +643,7 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
         fprintf(output,"0x%08X:\t%-25s\t%s=MEM[0x80808884]=0x%08X\n", arq->Reg[29],instrucao,whyIsReg(instruction->z,2),arq->Reg[instruction->z]);
 			  arq->Reg[29] = arq->Reg[29] + 4; 
       } else if(((arq->Reg[instruction->x] + IplusSinal) << 2) == 0x80808888){
-        arq->Reg[instruction->z] = convertToIEEE754((float)arq->fpu->z);
+        arq->Reg[instruction->z] = (arq->fpu->z < 9999)?(convertToIEEE754((float)arq->fpu->z)) : arq->fpu->z;
         fprintf(output,"0x%08X:\t%-25s\t%s=MEM[0x80808888]=0x%08X\n", arq->Reg[29],instrucao,whyIsReg(instruction->z,2),arq->Reg[instruction->z]);
 			  arq->Reg[29] = arq->Reg[29] + 4; 
       } else if(((arq->Reg[instruction->x] + IplusSinal) << 2) == 0x8888888B){
@@ -698,8 +725,7 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
 			} else if(arq->Reg[instruction->x] + IplusSinal == 0x8080888F){
 				arq->fpu->OPST = 0xFF & arq->Reg[instruction->z]; 
 				//if(arq->Reg[instruction->z] == 0xABC) printf("teste\n");
-				//printf("x = 0x%08X\n",(uint32_t)arq->fpu->x);
-				//printf("y = 0x%08X\n",(uint32_t)arq->fpu->y);
+
 				if(ShiftBit(arq->fpu->OPST,0,5) == 0b00001){
 					arq->fpu->z = (uint32_t)(arq->fpu->x + arq->fpu->y);
 					//arq->fpu->z = convertToIEEE754(arq->fpu->x + arq->fpu->y);
@@ -707,37 +733,47 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
 					
 				}
 				else if(ShiftBit(arq->fpu->OPST,0,5) == 0b00010){
+				printf("-----------> x = 0x%08X\n",arq->fpu->x);
+				printf("-----------> y = 0x%08X\n",arq->fpu->y);
+				printf("-----------> xint = 0x%08X\n",arq->fpu->x_int);
+				printf("-----------> yint = 0x%08X\n",arq->fpu->y_int);
 					arq->fpu->z = (uint32_t)(arq->fpu->x - arq->fpu->y);
 					//arq->fpu->z = convertToIEEE754(arq->fpu->x - arq->fpu->y);
 					arq->fpu->cicle = calcular_ciclos(arq->fpu->x_int,arq->fpu->y_int);
 					printf("0x%08X: ciclos = %d\n",arq->Reg[29],arq->fpu->cicle);
 				}
 				else if(ShiftBit(arq->fpu->OPST,0,5) == 0b00011){
+					printf("------------------------------------------\n");
 					arq->fpu->z = (uint32_t)(arq->fpu->x * arq->fpu->y);
 					//arq->fpu->z = convertToIEEE754(arq->fpu->x * arq->fpu->y);
-					arq->fpu->cicle = calcular_ciclos((uint32_t)arq->fpu->x,(uint32_t)arq->fpu->y);
+					arq->fpu->cicle = calcular_ciclos(arq->fpu->x_int,convertToIEEE754(arq->fpu->y_int));
+					printf("------------------------------------------\n");
 				}
 				else if(ShiftBit(arq->fpu->OPST,0,5) == 0b00100){
 					if(arq->fpu->y != 0){
-						arq->fpu->z = (uint32_t)(arq->fpu->x / arq->fpu->y);
-						//arq->fpu->z = convertToIEEE754(arq->fpu->x / arq->fpu->y);
+						printf("x = %.2f - y = %.2f - Result = 0x%08X\n",(float)convertFromIEEE754(arq->fpu->x_int),convertFromIEEE754(arq->fpu->y_int),convertFromIEEE754(convertFromIEEE754(arq->fpu->x_int) / convertFromIEEE754(arq->fpu->y_int)));
+						float res = (float)convertFromIEEE754(arq->fpu->x_int) / (float)convertFromIEEE754(arq->fpu->y_int); 
+						printf("ress = %f\n",res);
+						arq->fpu->z = decimal_para_ieee754(res);
+						printf("fpu z = 0x%08X\n",arq->fpu->z);
 						arq->fpu->cicle = calcular_ciclos(arq->fpu->x_int,arq->fpu->y_int);
-
 					} else {
 						//arq->fpu->z = convertToIEEE754(arq->fpu->z);
-						arq->fpu->cicle = calcular_ciclos(arq->fpu->x,arq->fpu->y);
+						arq->fpu->cicle = ShiftBit(arq->fpu->x_int,24,8) +  ShiftBit(arq->fpu->y_intAnt,24,8);
             			arq->fpu->OPST = arq->fpu->OPST | 0b100000;
 					}
 						//printf("ciclos int 2 = %d\n",arq->fpu->cicle);
 				}
 				else if(ShiftBit(arq->fpu->OPST,0,5) == 0b00101){
-					arq->fpu->x = *((float*)&arq->fpu->z);
+					arq->fpu->x = arq->fpu->z;
 					arq->fpu->x_int = convertToIEEE754(arq->fpu->z);
 					arq->fpu->cicle = 1;
 				}
 				else if(ShiftBit(arq->fpu->OPST,0,5) == 0b00110){
-					arq->fpu->y = *((float*)&arq->fpu->z);
-					arq->fpu->y_int = arq->fpu->z;
+					
+					arq->fpu->y = arq->fpu->z;
+					arq->fpu->y_intAnt = arq->fpu->y_int;
+					arq->fpu->y_int = convertToIEEE754(arq->fpu->z);
 					arq->fpu->cicle = 1;
 				}
 				else if(ShiftBit(arq->fpu->OPST,0,5) == 0b00111){
@@ -757,7 +793,7 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
            			arq->fpu->cicle = 1;
 					//printf("passou aqui\n");
         		}
-        fprintf(output,"0x%08X:\t%-25s\tMEM[0x%08X]=%s=0x%02X\n", arq->Reg[29],instrucao,(arq->Reg[instruction->x] + IplusSinal),whyIsReg(instruction->z,2),arq->fpu->OPST);
+        fprintf(output,"0x%08X:\t%-25s\tMEM[0x%08X]=%s=0x%02X\n", arq->Reg[29],instrucao,(arq->Reg[instruction->x] + IplusSinal),whyIsReg(instruction->z,2),arq->fpu->OPST&0x1F);
 				
 				arq->lastR27 =  arq->Reg[27];
 				printf("R27 = 0x%08X\n",arq->lastR27);
@@ -825,6 +861,7 @@ void executionInstructionTypeF(ArqResources* arq,typeF* instruction,FILE* output
 		        arq->Reg[29] = arq->Reg[29] + 4;
 		      }else if(((arq->Reg[instruction->x] + IplusSinal) << 2) == 0x80808884){
 		        arq->fpu->y = (float)arq->Reg[instruction->z];
+				arq->fpu->y_intAnt = arq->fpu->y_int;
 				arq->fpu->y_int = arq->Reg[instruction->z];
 		        fprintf(output,"0x%08X:\t%-25s\tMEM[0x%08X]=%s=0x%08X\n", arq->Reg[29],instrucao,(arq->Reg[instruction->x] + IplusSinal) << 2,whyIsReg(instruction->z,2),arq->Reg[instruction->z]);
 		        arq->Reg[29] = arq->Reg[29] + 4;
@@ -1298,6 +1335,7 @@ void processFile(FILE* input,FILE* output){
 	fprintf(output,"[START OF SIMULATION]\n");
 	while(exec){
 		//printf("R[27] = 0x%08X\n",newArq->Reg[27]);
+		printf("0x%08X:fpu z = 0x%08X\n",newArq->Reg[29],newArq->fpu->z);
 		if(newArq->wdog->isActivate == 1 && ShiftBit(newArq->Reg[31],1,1) == 1){
 			newArq->wdog->isActivate = 0;
 			
@@ -1365,7 +1403,7 @@ void processFile(FILE* input,FILE* output){
 			i++;
 		//	if(i == 1150) break;
 		}
-		if((ShiftBit(newArq->fpu->OPST,0,5) == 0b00100  && ShiftBit(newArq->Reg[31],1,1) == 0b1 && newArq->fpu->cicle == 0 && newArq->Reg[29] != 0x00000014 ) ||( ShiftBit(newArq->fpu->OPST,5,1) == 0b1 && newArq->fpu->cicle == 0)){
+		if( ShiftBit(newArq->Reg[31],1,1) == 0b1 && newArq->fpu->cicle == 0 && ShiftBit(newArq->fpu->OPST,5,1) == 0b1 ){
 			
       		newArq->Mem[newArq->Reg[30]] = newArq->Reg[29];
 				newArq->Reg[30] = newArq->Reg[30] - 4;
@@ -1382,8 +1420,7 @@ void processFile(FILE* input,FILE* output){
 			//printf("interruption 2 -------------------------------\n");
       		newArq->fpu->OPST = newArq->fpu->OPST & 0b000000; 
 			
-		} else if(ShiftBit(newArq->fpu->OPST,0,5) >= 0b1 && ShiftBit(newArq->fpu->OPST,0,5) <= 0b11 && ShiftBit(newArq->fpu->OPST,5,1) == 0b0 && ShiftBit(newArq->Reg[31],1,1) == 0b1 && newArq->fpu->cicle == 0 && newArq->Reg[29] != 0x00000018){
-			//
+		} else if((ShiftBit(newArq->fpu->OPST,0,5) >= 0b1 && ShiftBit(newArq->fpu->OPST,0,5) <= 0b100 && ShiftBit(newArq->fpu->OPST,5,1) == 0b0 && ShiftBit(newArq->Reg[31],1,1) == 0b1 && newArq->fpu->cicle == 0 )){
       			newArq->Mem[newArq->Reg[30]] = newArq->Reg[29];
 				newArq->Reg[30] = newArq->Reg[30] - 4;
 				newArq->Mem[newArq->Reg[30]] = newArq->Reg[26];
